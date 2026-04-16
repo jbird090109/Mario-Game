@@ -9,6 +9,7 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
     private static final int FPS = 60;
 
     private Player player;
+    private HUD hud;
     private Thread gameThread;
     private boolean running = false;
 
@@ -19,6 +20,7 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         addKeyListener(this);
 
         player = new Player(100, 650);
+        hud = new HUD();
     }
 
     public void start() {
@@ -49,6 +51,7 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
 
     private void update() {
         player.update();
+        hud.update();
     }
 
     @Override
@@ -57,6 +60,7 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         Graphics2D g2d = (Graphics2D) g;
 
         player.draw(g2d);
+        hud.draw(g2d, WIDTH, HEIGHT);
 
         g2d.dispose();
     }
