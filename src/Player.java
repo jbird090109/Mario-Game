@@ -58,13 +58,13 @@ public class Player {
     }
 
     public void handleKeyPress(int keyCode) {
-        if (keyCode == KeyEvent.VK_LEFT) {
+        if (keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_A) {
             leftPressed = true;
         }
-        if (keyCode == KeyEvent.VK_RIGHT) {
+        if (keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
             rightPressed = true;
         }
-        if (keyCode == KeyEvent.VK_SPACE && onGround) {
+        if ((keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) && onGround) {
             velocityY = jumpPower;
             jumping = true;
             onGround = false;
@@ -72,10 +72,10 @@ public class Player {
     }
 
     public void handleKeyRelease(int keyCode) {
-        if (keyCode == KeyEvent.VK_LEFT) {
+        if (keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_A) {
             leftPressed = false;
         }
-        if (keyCode == KeyEvent.VK_RIGHT) {
+        if (keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
             rightPressed = false;
         }
     }
