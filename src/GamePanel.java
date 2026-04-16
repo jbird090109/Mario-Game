@@ -4,8 +4,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 
 public class GamePanel extends JPanel implements KeyListener, Runnable {
-    private static final int WIDTH = 800;
-    private static final int HEIGHT = 600;
+    private static final int WIDTH = 1200;
+    private static final int HEIGHT = 800;
     private static final int FPS = 60;
 
     private Player player;
@@ -18,7 +18,7 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         setFocusable(true);
         addKeyListener(this);
 
-        player = new Player(100, 400);
+        player = new Player(100, 650);
     }
 
     public void start() {
