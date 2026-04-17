@@ -19,7 +19,8 @@ public class Player {
     private double acceleration = 1.2;
     private double friction = 0.85; // Slide/deceleration factor (0-1)
     private int jumpPower = -15;
-    private int gravity = 1;
+    private double gravityAscent = 0.6; // Lower gravity while jumping up (floaty SMW feel)
+    private double gravityDescent = 1.2; // Moderate gravity while falling
     private boolean jumping = false;
     private boolean onGround = false;
 
@@ -32,7 +33,21 @@ public class Player {
     private List<BufferedImage> runningRightFrames = new ArrayList<>();
     private List<BufferedImage> runningLeftFrames = new ArrayList<>();
     
+    // Jump sprites
+    private BufferedImage jumpUpRight;
+    private BufferedImage jumpUpLeft;
+    private BufferedImage jumpDownRight;
+    private BufferedImage jumpDownLeft;
+    
     private int currentRunningFrame = 0;
+    
+    // Jump variables (Super Mario World style)
+    private boolean jumpKeyPressed = false;
+    private int jumpKeyHeldFrames = 0;
+    private int maxJumpKeyFrames = 14; // Duration to hold button for max height
+    private double jumpForceAccumulator = 0;
+    private int hangTimeCounter = 0; // For apex hang time (SMW-like feel)
+    private int hangTimeFrames = 6; // Frames of reduced gravity at apex (floaty feeling)
 
     // Direction tracking
     private enum Direction {
@@ -69,12 +84,22 @@ public class Player {
             loadGifFrames(new File(assetsDir, "Running Right.gif"), runningRightFrames);
             loadGifFrames(new File(assetsDir, "Running Left.gif"), runningLeftFrames);
             
+            // Load jump sprites
+            jumpUpRight = ImageIO.read(new File(assetsDir, "jumpingupright.png"));
+            jumpUpLeft = ImageIO.read(new File(assetsDir, "jumpingupleft.png"));
+            jumpDownRight = ImageIO.read(new File(assetsDir, "jumpingrightdown.png"));
+            jumpDownLeft = ImageIO.read(new File(assetsDir, "jumpingleftdown.png"));
+            
             if (idleRight != null) {
                 System.out.println("Sprites loaded successfully from: " + assetsDir.getAbsolutePath());
                 System.out.println("Idle Right: " + (idleRight != null));
                 System.out.println("Idle Left: " + (idleLeft != null));
                 System.out.println("Running Right frames: " + runningRightFrames.size());
                 System.out.println("Running Left frames: " + runningLeftFrames.size());
+                System.out.println("Jump Up Right: " + (jumpUpRight != null));
+                System.out.println("Jump Up Left: " + (jumpUpLeft != null));
+                System.out.println("Jump Down Right: " + (jumpDownRight != null));
+                System.out.println("Jump Down Left: " + (jumpDownLeft != null));
             }
         } catch (Exception e) {
             System.err.println("Error loading sprites: " + e.getMessage());
@@ -112,13 +137,17 @@ public class Player {
 
     public void update() {
         // Momentum-based movement with acceleration and friction
+        // Reduce control when in the air (air strafing is slower)
+        double currentAcceleration = onGround ? acceleration : acceleration * 0.5;
+        double currentMaxSpeed = onGround ? maxSpeed : maxSpeed * 0.6;
+        
         if (leftPressed) {
-            velocityX -= acceleration;
-            if (velocityX < -maxSpeed) velocityX = -maxSpeed;
+            velocityX -= currentAcceleration;
+            if (velocityX < -currentMaxSpeed) velocityX = -currentMaxSpeed;
             facingDirection = Direction.LEFT;
         } else if (rightPressed) {
-            velocityX += acceleration;
-            if (velocityX > maxSpeed) velocityX = maxSpeed;
+            velocityX += currentAcceleration;
+            if (velocityX > currentMaxSpeed) velocityX = currentMaxSpeed;
             facingDirection = Direction.RIGHT;
         } else {
             // Apply friction when no key is pressed (sliding effect)
@@ -126,6 +155,43 @@ public class Player {
             // Stop completely if very slow
             if (Math.abs(velocityX) < 0.1) {
                 velocityX = 0;
+            }
+        }
+
+        // Handle variable jump - accumulate jump force while key is held (SMW-style)
+        if (jumpKeyPressed && jumpKeyHeldFrames < maxJumpKeyFrames) {
+            jumpKeyHeldFrames++;
+            // Each frame adds more upward velocity (smooth, responsive)
+            jumpForceAccumulator -= 1.15; // Reduced for more balanced height
+            // Apply the accumulated force to velocityY while holding the key
+            velocityY = jumpForceAccumulator;
+        } else if (jumpKeyPressed && jumpKeyHeldFrames >= maxJumpKeyFrames) {
+            // Maximum jump hold time reached - apply the jump force
+            jumpKeyPressed = false;
+            velocityY = jumpForceAccumulator;
+            // Ensure strong minimum jump
+            if (velocityY > -9) {
+                velocityY = -9;
+            }
+            jumpForceAccumulator = 0;
+            hangTimeCounter = hangTimeFrames; // Add extended hang time at apex (SMW floaty feel)
+        }
+
+        // Apply variable gravity based on jump phase (SMW physics)
+        if (!onGround) {
+            if (jumpKeyPressed) {
+                // While holding jump - very low gravity (floaty ascent)
+                velocityY += gravityAscent * 0.3; // Extra floaty during hold
+            } else if (hangTimeCounter > 0 && velocityY < 0) {
+                // Apex hang time - reduced gravity (floaty peak)
+                hangTimeCounter--;
+                velocityY += gravityAscent; // Low gravity at peak
+            } else if (velocityY < 0) {
+                // Ascending without holding - moderate reduced gravity
+                velocityY += gravityAscent;
+            } else {
+                // Descending - normal gravity
+                velocityY += gravityDescent;
             }
         }
 
@@ -142,10 +208,6 @@ public class Player {
 
         x += (int) velocityX;
 
-        if (!onGround) {
-            velocityY += gravity;
-        }
-
         y += velocityY;
 
         if (y >= 700) {
@@ -153,6 +215,10 @@ public class Player {
             velocityY = 0;
             onGround = true;
             jumping = false;
+            jumpKeyPressed = false;
+            jumpKeyHeldFrames = 0;
+            jumpForceAccumulator = 0;
+            hangTimeCounter = 0;
         } else {
             onGround = false;
         }
@@ -163,10 +229,30 @@ public class Player {
 
     public void draw(Graphics2D g) {
         BufferedImage currentSprite = null;
+        int drawWidth = width;
+        int drawHeight = height;
 
-        // Choose sprite based on direction and movement
-        // Only show running animation if moving above a threshold (avoids animation during slow sliding)
-        if (Math.abs(velocityX) > 1.0) {
+        // Check if currently jumping
+        if (jumping || (velocityY != 0 && !onGround)) {
+            // Choose jump sprite based on direction and velocity
+            drawWidth = 45; // Smaller width for jump sprites
+            drawHeight = 60;
+            if (velocityY < 0) {
+                // Going up
+                if (facingDirection == Direction.RIGHT) {
+                    currentSprite = jumpUpRight;
+                } else {
+                    currentSprite = jumpUpLeft;
+                }
+            } else {
+                // Coming down
+                if (facingDirection == Direction.RIGHT) {
+                    currentSprite = jumpDownRight;
+                } else {
+                    currentSprite = jumpDownLeft;
+                }
+            }
+        } else if (Math.abs(velocityX) > 1.0) {
             // Running - cycle through animation frames
             if (facingDirection == Direction.RIGHT) {
                 if (!runningRightFrames.isEmpty()) {
@@ -190,10 +276,10 @@ public class Player {
 
         // Draw sprite if loaded, otherwise draw placeholder
         if (currentSprite != null) {
-            g.drawImage(currentSprite, x, y, width, height, null);
+            g.drawImage(currentSprite, x, y, drawWidth, drawHeight, null);
         } else {
             g.setColor(Color.RED);
-            g.fillRect(x, y, width, height);
+            g.fillRect(x, y, drawWidth, drawHeight);
         }
     }
 
@@ -204,8 +290,11 @@ public class Player {
         if (keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
             rightPressed = true;
         }
-        if ((keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) && onGround) {
-            velocityY = jumpPower;
+        if ((keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) && onGround && !jumpKeyPressed) {
+            // Start tracking jump key press for variable jump height
+            jumpKeyPressed = true;
+            jumpKeyHeldFrames = 0;
+            jumpForceAccumulator = 0;
             jumping = true;
             onGround = false;
         }
@@ -217,6 +306,18 @@ public class Player {
         }
         if (keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
             rightPressed = false;
+        }
+        if (keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) {
+            // Apply accumulated jump force when key is released
+            if (jumpKeyPressed) {
+                jumpKeyPressed = false;
+                // Apply the accumulated jump force based on how long key was held
+                velocityY = jumpForceAccumulator;
+                // Ensure minimum jump
+                if (velocityY > -5) {
+                    velocityY = -5;
+                }
+            }
         }
     }
 
