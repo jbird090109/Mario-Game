@@ -13,9 +13,11 @@ public class Player {
     private int y;
     private int width = 60;
     private int height = 60;
-    private int velocityX = 0;
-    private int velocityY = 0;
-    private int speed = 5;
+    private double velocityX = 0;
+    private double velocityY = 0;
+    private double maxSpeed = 9;
+    private double acceleration = 1.2;
+    private double friction = 0.85; // Slide/deceleration factor (0-1)
     private int jumpPower = -15;
     private int gravity = 1;
     private boolean jumping = false;
@@ -40,7 +42,7 @@ public class Player {
 
     // Animation tracking
     private int frameCount = 0;
-    private int frameDelay = 5; // Frames per animation frame (lower = faster)
+    private int frameDelay = 2; // Frames per animation frame (lower = faster)
 
     public Player(int x, int y) {
         this.x = x;
@@ -109,14 +111,22 @@ public class Player {
     }
 
     public void update() {
+        // Momentum-based movement with acceleration and friction
         if (leftPressed) {
-            velocityX = -speed;
+            velocityX -= acceleration;
+            if (velocityX < -maxSpeed) velocityX = -maxSpeed;
             facingDirection = Direction.LEFT;
         } else if (rightPressed) {
-            velocityX = speed;
+            velocityX += acceleration;
+            if (velocityX > maxSpeed) velocityX = maxSpeed;
             facingDirection = Direction.RIGHT;
         } else {
-            velocityX = 0;
+            // Apply friction when no key is pressed (sliding effect)
+            velocityX *= friction;
+            // Stop completely if very slow
+            if (Math.abs(velocityX) < 0.1) {
+                velocityX = 0;
+            }
         }
 
         // Update animation frame counter for running animations
@@ -130,7 +140,7 @@ public class Player {
             currentRunningFrame++;
         }
 
-        x += velocityX;
+        x += (int) velocityX;
 
         if (!onGround) {
             velocityY += gravity;
@@ -155,7 +165,8 @@ public class Player {
         BufferedImage currentSprite = null;
 
         // Choose sprite based on direction and movement
-        if (velocityX != 0) {
+        // Only show running animation if moving above a threshold (avoids animation during slow sliding)
+        if (Math.abs(velocityX) > 1.0) {
             // Running - cycle through animation frames
             if (facingDirection == Direction.RIGHT) {
                 if (!runningRightFrames.isEmpty()) {
