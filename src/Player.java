@@ -15,12 +15,12 @@ public class Player {
     private int height = 60;
     private double velocityX = 0;
     private double velocityY = 0;
-    private double maxSpeed = 9;
-    private double acceleration = 1.2;
+    private double maxSpeed = 12.0;
+    private double acceleration = 1.5;
     private double friction = 0.85; // Slide/deceleration factor (0-1)
     private int jumpPower = -15;
-    private double gravityAscent = 0.6; // Lower gravity while jumping up (floaty SMW feel)
-    private double gravityDescent = 1.2; // Moderate gravity while falling
+    private double gravityAscent = 1.50; // Gravity while ascending
+    private double gravityDescent = 1.50; // Gravity while descending
     private boolean jumping = false;
     private boolean onGround = false;
 
@@ -47,7 +47,7 @@ public class Player {
     private int maxJumpKeyFrames = 14; // Duration to hold button for max height
     private double jumpForceAccumulator = 0;
     private int hangTimeCounter = 0; // For apex hang time (SMW-like feel)
-    private int hangTimeFrames = 6; // Frames of reduced gravity at apex (floaty feeling)
+    private int hangTimeFrames = 2; // Frames of reduced gravity at apex
 
     // Direction tracking
     private enum Direction {
@@ -139,7 +139,7 @@ public class Player {
         // Momentum-based movement with acceleration and friction
         // Reduce control when in the air (air strafing is slower)
         double currentAcceleration = onGround ? acceleration : acceleration * 0.5;
-        double currentMaxSpeed = onGround ? maxSpeed : maxSpeed * 0.6;
+        double currentMaxSpeed = onGround ? maxSpeed : maxSpeed * 0.9;
         
         if (leftPressed) {
             velocityX -= currentAcceleration;
@@ -162,7 +162,7 @@ public class Player {
         if (jumpKeyPressed && jumpKeyHeldFrames < maxJumpKeyFrames) {
             jumpKeyHeldFrames++;
             // Each frame adds more upward velocity (smooth, responsive)
-            jumpForceAccumulator -= 1.15; // Reduced for more balanced height
+            jumpForceAccumulator -= 1.5; // More balanced jump height
             // Apply the accumulated force to velocityY while holding the key
             velocityY = jumpForceAccumulator;
         } else if (jumpKeyPressed && jumpKeyHeldFrames >= maxJumpKeyFrames) {
@@ -170,24 +170,24 @@ public class Player {
             jumpKeyPressed = false;
             velocityY = jumpForceAccumulator;
             // Ensure strong minimum jump
-            if (velocityY > -9) {
-                velocityY = -9;
+            if (velocityY > -11) {
+                velocityY = -11;
             }
             jumpForceAccumulator = 0;
-            hangTimeCounter = hangTimeFrames; // Add extended hang time at apex (SMW floaty feel)
+            hangTimeCounter = hangTimeFrames; // Brief reduced gravity at apex
         }
 
         // Apply variable gravity based on jump phase (SMW physics)
         if (!onGround) {
             if (jumpKeyPressed) {
-                // While holding jump - very low gravity (floaty ascent)
-                velocityY += gravityAscent * 0.3; // Extra floaty during hold
+                // While holding jump - reduced gravity for variable height
+                velocityY += gravityAscent * 0.6;
             } else if (hangTimeCounter > 0 && velocityY < 0) {
-                // Apex hang time - reduced gravity (floaty peak)
+                // Apex hang time - minimal reduced gravity
                 hangTimeCounter--;
-                velocityY += gravityAscent; // Low gravity at peak
+                velocityY += gravityAscent * 0.9; // Barely reduced at peak
             } else if (velocityY < 0) {
-                // Ascending without holding - moderate reduced gravity
+                // Ascending without holding - apply ascent gravity
                 velocityY += gravityAscent;
             } else {
                 // Descending - normal gravity
@@ -294,7 +294,8 @@ public class Player {
             // Start tracking jump key press for variable jump height
             jumpKeyPressed = true;
             jumpKeyHeldFrames = 0;
-            jumpForceAccumulator = 0;
+            jumpForceAccumulator = -1.5; // Start with initial jump force for immediate response
+            velocityY = jumpForceAccumulator; // Apply immediately
             jumping = true;
             onGround = false;
         }
@@ -314,8 +315,8 @@ public class Player {
                 // Apply the accumulated jump force based on how long key was held
                 velocityY = jumpForceAccumulator;
                 // Ensure minimum jump
-                if (velocityY > -5) {
-                    velocityY = -5;
+                if (velocityY > -3) {
+                    velocityY = -3;
                 }
             }
         }
