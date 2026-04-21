@@ -20,7 +20,7 @@ public class Player {
     private double friction = 0.85; // Slide/deceleration factor (0-1)
     private int jumpPower = -15;
     private double gravityAscent = 1.50; // Gravity while ascending
-    private double gravityDescent = 1.50; // Gravity while descending
+    private double gravityDescent = 1.8; // Gravity while descending - faster fall
     private boolean jumping = false;
     private boolean onGround = false;
 
@@ -158,36 +158,19 @@ public class Player {
             }
         }
 
-        // Handle variable jump - accumulate jump force while key is held (SMW-style)
+        // Track max jump hold time (no longer needed for accumulation, just for feedback)
         if (jumpKeyPressed && jumpKeyHeldFrames < maxJumpKeyFrames) {
             jumpKeyHeldFrames++;
-            // Each frame adds more upward velocity (smooth, responsive)
-            jumpForceAccumulator -= 1.5; // More balanced jump height
-            // Apply the accumulated force to velocityY while holding the key
-            velocityY = jumpForceAccumulator;
-        } else if (jumpKeyPressed && jumpKeyHeldFrames >= maxJumpKeyFrames) {
-            // Maximum jump hold time reached - apply the jump force
-            jumpKeyPressed = false;
-            velocityY = jumpForceAccumulator;
-            // Ensure strong minimum jump
-            if (velocityY > -11) {
-                velocityY = -11;
-            }
-            jumpForceAccumulator = 0;
-            hangTimeCounter = hangTimeFrames; // Brief reduced gravity at apex
         }
 
-        // Apply variable gravity based on jump phase (SMW physics)
+        // Apply variable gravity based on jump phase (classic Mario physics)
         if (!onGround) {
-            if (jumpKeyPressed) {
-                // While holding jump - reduced gravity for variable height
-                velocityY += gravityAscent * 0.6;
-            } else if (hangTimeCounter > 0 && velocityY < 0) {
-                // Apex hang time - minimal reduced gravity
-                hangTimeCounter--;
-                velocityY += gravityAscent * 0.9; // Barely reduced at peak
+            if (jumpKeyPressed && velocityY < 0) {
+                // While holding jump button AND ascending - reduced gravity for variable height
+                // This allows jumping higher by holding, and lower if released early
+                velocityY += gravityAscent * 0.5; // Reduced gravity extends hang time
             } else if (velocityY < 0) {
-                // Ascending without holding - apply ascent gravity
+                // Ascending without holding jump button - normal ascent gravity
                 velocityY += gravityAscent;
             } else {
                 // Descending - normal gravity
@@ -291,11 +274,10 @@ public class Player {
             rightPressed = true;
         }
         if ((keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) && onGround && !jumpKeyPressed) {
-            // Start tracking jump key press for variable jump height
+            // Apply instant jump burst for that classic Mario leap feel
             jumpKeyPressed = true;
             jumpKeyHeldFrames = 0;
-            jumpForceAccumulator = -1.5; // Start with initial jump force for immediate response
-            velocityY = jumpForceAccumulator; // Apply immediately
+            velocityY = -22; // Strong initial burst velocity - higher jump!
             jumping = true;
             onGround = false;
         }
@@ -309,15 +291,11 @@ public class Player {
             rightPressed = false;
         }
         if (keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) {
-            // Apply accumulated jump force when key is released
+            // Release jump key - gravity takes over naturally
+            // By releasing the key, you lose the reduced gravity bonus and fall faster
             if (jumpKeyPressed) {
                 jumpKeyPressed = false;
-                // Apply the accumulated jump force based on how long key was held
-                velocityY = jumpForceAccumulator;
-                // Ensure minimum jump
-                if (velocityY > -3) {
-                    velocityY = -3;
-                }
+                // Let normal gravity handle the descent - no need to set velocity
             }
         }
     }
