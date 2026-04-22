@@ -9,6 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Player {
+    private List<Platform> platforms;
+    private int levelWidth;
+    private int levelHeight;
     private int x;
     private int y;
     private int width = 60;
@@ -59,9 +62,12 @@ public class Player {
     private int frameCount = 0;
     private int frameDelay = 2; // Frames per animation frame (lower = faster)
 
-    public Player(int x, int y) {
+    public Player(int x, int y, List<Platform> platforms, int levelWidth, int levelHeight) {
         this.x = x;
         this.y = y;
+        this.platforms = platforms;
+        this.levelWidth = levelWidth;
+        this.levelHeight = levelHeight;
         loadSprites();
     }
 
@@ -193,8 +199,32 @@ public class Player {
 
         y += velocityY;
 
-        if (y >= 700) {
-            y = 700;
+        // Check collision with platforms
+        onGround = false;
+        for (Platform platform : platforms) {
+            if (platform.intersects(x, y, width, height)) {
+                if (velocityY > 0) {
+                    // Landing on top of platform
+                    y = platform.getY() - height;
+                    velocityY = 0;
+                    onGround = true;
+                    jumping = false;
+                    jumpKeyPressed = false;
+                    jumpKeyHeldFrames = 0;
+                    jumpForceAccumulator = 0;
+                    hangTimeCounter = 0;
+                } else if (velocityY < 0) {
+                    // Hitting head on platform
+                    y = platform.getY() + platform.getHeight();
+                    velocityY = 0;
+                }
+            }
+        }
+        
+        // Fallback to hard ground
+        int hardGroundLevel = levelHeight - 200; // Safety platform near bottom
+        if (y >= hardGroundLevel) {
+            y = hardGroundLevel;
             velocityY = 0;
             onGround = true;
             jumping = false;
@@ -202,12 +232,10 @@ public class Player {
             jumpKeyHeldFrames = 0;
             jumpForceAccumulator = 0;
             hangTimeCounter = 0;
-        } else {
-            onGround = false;
         }
 
         if (x < 0) x = 0;
-        if (x + width > 1200) x = 1200 - width;
+        if (x + width > levelWidth) x = levelWidth - width;
     }
 
     public void draw(Graphics2D g) {
