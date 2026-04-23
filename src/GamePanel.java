@@ -8,13 +8,13 @@ import java.io.File;
 import javax.imageio.ImageIO;
 import java.util.ArrayList;
 import java.util.List;
+import java.awt.RenderingHints;
 
 public class GamePanel extends JPanel implements KeyListener, Runnable {
     private static final int WIDTH = 1200;
     private static final int HEIGHT = 800;
     private static final int LEVEL_WIDTH = 4000;  // Extended level width
     private static final int LEVEL_HEIGHT = 1000; // Extended level height
-    private static final int FPS = 60;
 
     private Player player;
     private HUD hud;
