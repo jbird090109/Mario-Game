@@ -47,6 +47,8 @@ public class Player {
     private boolean jumpKeyPressed = false;
     private int jumpKeyHeldFrames = 0;
     private int maxJumpKeyFrames = 14; // Duration to hold button for max height
+    private int jumpBufferCounter = 0; // Jump input buffering for responsive jumps
+    private int jumpBufferWindow = 6; // Frames to buffer jump input (100ms at 60fps)
 
     // Direction tracking
     private enum Direction {
@@ -240,6 +242,21 @@ public class Player {
             jumpKeyPressed = false;
             jumpKeyHeldFrames = 0;
         }
+        
+        // Execute buffered jump if available and on ground
+        if (jumpBufferCounter > 0 && onGround && !jumping) {
+            velocityY = -22; // Jump force
+            jumping = true;
+            jumpKeyPressed = true;
+            jumpKeyHeldFrames = 0;
+            onGround = false;
+            jumpBufferCounter = 0; // Consume the buffer
+        }
+        
+        // Decrement jump buffer counter each frame
+        if (jumpBufferCounter > 0) {
+            jumpBufferCounter--;
+        }
 
         if (x < 0) x = 0;
         if (x + width > levelWidth) x = levelWidth - width;
@@ -315,13 +332,19 @@ public class Player {
         if (keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
             rightPressed = true;
         }
-        if ((keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) && onGround && !jumpKeyPressed) {
-            // Apply instant jump burst for that classic Mario leap feel
-            jumpKeyPressed = true;
-            jumpKeyHeldFrames = 0;
-            velocityY = -22; // Strong initial burst velocity - higher jump!
-            jumping = true;
-            onGround = false;
+        if (keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) {
+            // Set jump buffer for responsive jump detection
+            jumpBufferCounter = jumpBufferWindow;
+            
+            // Try to jump immediately if on ground
+            if (onGround && !jumping) {
+                velocityY = -22; // Jump force
+                jumping = true;
+                jumpKeyPressed = true;
+                jumpKeyHeldFrames = 0;
+                onGround = false;
+                jumpBufferCounter = 0; // Jump executed, clear buffer
+            }
         }
     }
 
