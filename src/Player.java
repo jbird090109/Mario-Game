@@ -199,7 +199,16 @@ public class Player {
         onGround = false;
         for (Platform platform : platforms) {
             if (platform.intersects(x, y, width, height)) {
-                if (velocityY > 0) {
+                // Calculate overlap on each side to determine collision direction
+                int overlapLeft = (x + width) - platform.getX();
+                int overlapRight = (platform.getX() + platform.getWidth()) - x;
+                int overlapTop = (y + height) - platform.getY();
+                int overlapBottom = (platform.getY() + platform.getHeight()) - y;
+                
+                // Find the minimum overlap to determine which side was hit
+                int minOverlap = Math.min(Math.min(overlapLeft, overlapRight), Math.min(overlapTop, overlapBottom));
+                
+                if (minOverlap == overlapTop && velocityY > 0) {
                     // Landing on top of platform
                     y = platform.getY() - height;
                     velocityY = 0;
@@ -207,16 +216,22 @@ public class Player {
                     jumping = false;
                     jumpKeyPressed = false;
                     jumpKeyHeldFrames = 0;
-                } else if (velocityY < 0) {
+                } else if (minOverlap == overlapBottom && velocityY < 0) {
                     // Hitting head on platform
                     y = platform.getY() + platform.getHeight();
                     velocityY = 0;
+                } else if (minOverlap == overlapLeft) {
+                    // Hitting platform from the left side
+                    x = platform.getX() - width;
+                } else if (minOverlap == overlapRight) {
+                    // Hitting platform from the right side
+                    x = platform.getX() + platform.getWidth();
                 }
             }
         }
         
         // Fallback to hard ground
-        int hardGroundLevel = levelHeight - 200; // Safety platform near bottom
+        int hardGroundLevel = levelHeight - 0; // Safety platform near bottom
         if (y >= hardGroundLevel) {
             y = hardGroundLevel;
             velocityY = 0;
@@ -284,6 +299,13 @@ public class Player {
             g.setColor(Color.RED);
             g.fillRect(x, y, drawWidth, drawHeight);
         }
+        
+        // Draw hitbox for debugging (temporary)
+        g.setColor(new Color(255, 0, 0, 100)); // Semi-transparent red
+        g.fillRect(x, y, width, height);
+        g.setColor(Color.RED);
+        g.setStroke(new BasicStroke(2));
+        g.drawRect(x, y, width, height);
     }
 
     public void handleKeyPress(int keyCode) {

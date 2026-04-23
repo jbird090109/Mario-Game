@@ -22,7 +22,8 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
     private Thread gameThread;
     private boolean running = false;
     
-    private BufferedImage backgroundImage;
+    private BufferedImage floorImage;
+    private List<Floor> floors;
     private List<Platform> platforms;
 
     public GamePanel() {
@@ -31,15 +32,17 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         setFocusable(true);
         addKeyListener(this);
         
+        floors = new ArrayList<>();
         platforms = new ArrayList<>();
-        loadBackgroundAndPlatforms();
+        loadFloorsAndPlatforms();
 
         player = new Player(50, 620, platforms, LEVEL_WIDTH, LEVEL_HEIGHT);
         camera = new Camera(WIDTH, HEIGHT, LEVEL_WIDTH, LEVEL_HEIGHT, player);
         hud = new HUD();
     }
     
-    private void loadBackgroundAndPlatforms() {
+    private void loadFloorsAndPlatforms() {
+        // Load floor image
         try {
             File assetsDir = new File("assets");
             if (!assetsDir.exists()) {
@@ -49,59 +52,47 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
                 assetsDir = new File(System.getProperty("user.dir") + "/assets");
             }
             
-            File bgFile = new File(assetsDir, "SNES - Super Mario World - Donut Plains Stages - Donut Plains 4.png");
-            if (bgFile.exists()) {
-                backgroundImage = ImageIO.read(bgFile);
-                System.out.println("Background image loaded: " + bgFile.getAbsolutePath());
-                System.out.println("Background size: " + backgroundImage.getWidth() + "x" + backgroundImage.getHeight());
+            File floorFile = new File(assetsDir, "floor.png");
+            if (floorFile.exists()) {
+                floorImage = ImageIO.read(floorFile);
+                System.out.println("Floor image loaded: " + floorFile.getAbsolutePath());
+                System.out.println("Floor image size: " + floorImage.getWidth() + "x" + floorImage.getHeight());
             } else {
-                System.err.println("Background image not found at: " + bgFile.getAbsolutePath());
+                System.err.println("Floor image not found at: " + floorFile.getAbsolutePath());
             }
         } catch (Exception e) {
-            System.err.println("Error loading background: " + e.getMessage());
+            System.err.println("Error loading floor image: " + e.getMessage());
             e.printStackTrace();
         }
         
-        // Create a clean, single-level platformer with proper spacing
-        // Ground base throughout the level
-        platforms.add(new Platform(0, 700, 3000, 100)); // Main ground
+        // Create a line of floor sections with gaps in between
+        // Floor dimensions - render width is the full image, but hitbox width is smaller to create gaps
+        int renderWidth = floorImage != null ? floorImage.getWidth() : 100;
+        int hitboxWidth = (int)(renderWidth); // Reduce hitbox to 70% of render width
+        int renderHeight = floorImage != null ? floorImage.getHeight() : 50;
+        int floorY = 650; // Floor Y position
         
-        // Section 1: Tutorial area (0-300px) - Easy platforming
-        platforms.add(new Platform(150, 600, 150, 50));  // First platform
-        platforms.add(new Platform(350, 550, 150, 50));  // Second platform (higher)
+        // Section 1: Tutorial area with gaps
+        addFloorSection(0, floorY, renderWidth, hitboxWidth, renderHeight);
+        addFloorSection(renderWidth + 180, floorY, renderWidth, hitboxWidth, renderHeight); // Gap of 180px
+        addFloorSection((renderWidth + 180) * 2 + 70, floorY, renderWidth, hitboxWidth, renderHeight); // Larger gap
         
-        // Section 2: Ascending challenge (300-600px)
-        platforms.add(new Platform(450, 600, 120, 50));
-        platforms.add(new Platform(600, 550, 120, 50));
-        platforms.add(new Platform(750, 500, 120, 50));
+        // Section 2: Mid-level with varied gaps
+        addFloorSection((renderWidth + 180) * 3 + 240, floorY, renderWidth, hitboxWidth, renderHeight); // Even bigger gap
+        addFloorSection((renderWidth + 180) * 4, floorY, renderWidth, hitboxWidth, renderHeight); // Normal gap
+        addFloorSection((renderWidth + 180) * 5 + 320, floorY, renderWidth, hitboxWidth, renderHeight); // Very large gap
         
-        // Section 3: Peak and descent (600-900px)
-        platforms.add(new Platform(900, 450, 100, 50));  // Peak platform
-        platforms.add(new Platform(1050, 500, 120, 50));
-        platforms.add(new Platform(1200, 550, 120, 50));
+        // Section 3: Final sections
+        addFloorSection((renderWidth + 180) * 6 + 140, floorY, renderWidth, hitboxWidth, renderHeight);
+        addFloorSection((renderWidth + 180) * 7 + 260, floorY, renderWidth, hitboxWidth, renderHeight);
         
-        // Section 4: Horizontal challenge (900-1200px) - Side-by-side platforms
-        platforms.add(new Platform(1350, 600, 100, 50));
-        platforms.add(new Platform(1500, 600, 100, 50));
-        platforms.add(new Platform(1650, 600, 100, 50));
-        
-        // Section 5: Staircase up (1200-1500px)
-        platforms.add(new Platform(1800, 550, 120, 50));
-        platforms.add(new Platform(1950, 500, 120, 50));
-        platforms.add(new Platform(2100, 450, 120, 50));
-        
-        // Section 6: Gap challenge (1500-1800px) - Wider spacing
-        platforms.add(new Platform(2250, 500, 100, 50));
-        platforms.add(new Platform(2400, 550, 100, 50));
-        
-        // Section 7: Final climb (1800-2200px)
-        platforms.add(new Platform(2550, 600, 120, 50));
-        platforms.add(new Platform(2700, 550, 120, 50));
-        
-        // Section 8: Home stretch (2200-3000px)
-        platforms.add(new Platform(2850, 600, 150, 50));
-        
-        System.out.println("Total platforms created: " + platforms.size());
+        System.out.println("Total floor sections created: " + floors.size());
+        System.out.println("Total collision platforms created: " + platforms.size());
+    }
+    
+    private void addFloorSection(int x, int y, int renderWidth, int hitboxWidth, int height) {
+        floors.add(new Floor(x, y, renderWidth, height, floorImage));
+        platforms.add(new Platform(x, y, hitboxWidth, height));
     }
 
     public void start() {
@@ -148,32 +139,19 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         // Apply camera translation
         g2d.translate(-camera.getX(), -camera.getY());
         
-        // Draw background image tiled horizontally only
-        if (backgroundImage != null) {
-            int bgWidth = backgroundImage.getWidth();
-            
-            // Calculate which tiles to draw based on camera position
-            int startX = (camera.getX() / bgWidth) * bgWidth;
-            int endX = startX + WIDTH + bgWidth;
-            
-            for (int x = startX; x < endX; x += bgWidth) {
-                // Draw background stretched to fit level height, positioned at top
-                g2d.drawImage(backgroundImage, x, 0, bgWidth, LEVEL_HEIGHT, null);
-            }
-        } else {
-            // Fallback: draw solid background
-            g2d.setColor(new Color(135, 206, 235));
-            g2d.fillRect(0, 0, LEVEL_WIDTH, LEVEL_HEIGHT);
+        // Draw floor objects
+        for (Floor floor : floors) {
+            floor.draw(g2d);
         }
         
-        // Debug: Uncomment to visualize platform hitboxes
-        // for (Platform p : platforms) {
-        //     g2d.setColor(new Color(0, 255, 0, 50));
-        //     g2d.fillRect(p.getX(), p.getY(), p.getWidth(), p.getHeight());
-        //     g2d.setColor(Color.GREEN);
-        //     g2d.setStroke(new BasicStroke(2));
-        //     g2d.drawRect(p.getX(), p.getY(), p.getWidth(), p.getHeight());
-        // }
+        // Draw floor hitboxes for debugging
+        for (Platform p : platforms) {
+            g2d.setColor(new Color(0, 255, 0, 100)); // Semi-transparent green
+            g2d.fillRect(p.getX(), p.getY(), p.getWidth(), p.getHeight());
+            g2d.setColor(Color.GREEN);
+            g2d.setStroke(new BasicStroke(2));
+            g2d.drawRect(p.getX(), p.getY(), p.getWidth(), p.getHeight());
+        }
 
         player.draw(g2d);
         
