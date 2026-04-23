@@ -21,7 +21,6 @@ public class Player {
     private double maxSpeed = 12.0;
     private double acceleration = 1.5;
     private double friction = 0.85; // Slide/deceleration factor (0-1)
-    private int jumpPower = -15;
     private double gravityAscent = 1.50; // Gravity while ascending
     private double gravityDescent = 1.8; // Gravity while descending - faster fall
     private boolean jumping = false;
@@ -48,9 +47,6 @@ public class Player {
     private boolean jumpKeyPressed = false;
     private int jumpKeyHeldFrames = 0;
     private int maxJumpKeyFrames = 14; // Duration to hold button for max height
-    private double jumpForceAccumulator = 0;
-    private int hangTimeCounter = 0; // For apex hang time (SMW-like feel)
-    private int hangTimeFrames = 2; // Frames of reduced gravity at apex
 
     // Direction tracking
     private enum Direction {
@@ -211,8 +207,6 @@ public class Player {
                     jumping = false;
                     jumpKeyPressed = false;
                     jumpKeyHeldFrames = 0;
-                    jumpForceAccumulator = 0;
-                    hangTimeCounter = 0;
                 } else if (velocityY < 0) {
                     // Hitting head on platform
                     y = platform.getY() + platform.getHeight();
@@ -230,8 +224,6 @@ public class Player {
             jumping = false;
             jumpKeyPressed = false;
             jumpKeyHeldFrames = 0;
-            jumpForceAccumulator = 0;
-            hangTimeCounter = 0;
         }
 
         if (x < 0) x = 0;

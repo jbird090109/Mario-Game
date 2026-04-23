@@ -13,8 +13,8 @@ import java.awt.RenderingHints;
 public class GamePanel extends JPanel implements KeyListener, Runnable {
     private static final int WIDTH = 1200;
     private static final int HEIGHT = 800;
-    private static final int LEVEL_WIDTH = 4000;  // Extended level width
-    private static final int LEVEL_HEIGHT = 1000; // Extended level height
+    private static final int LEVEL_WIDTH = 3000;  // Single horizontal level
+    private static final int LEVEL_HEIGHT = 800;  // Match viewport height to prevent tiling
 
     private Player player;
     private HUD hud;
@@ -34,7 +34,7 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         platforms = new ArrayList<>();
         loadBackgroundAndPlatforms();
 
-        player = new Player(100, 650, platforms, LEVEL_WIDTH, LEVEL_HEIGHT);
+        player = new Player(50, 620, platforms, LEVEL_WIDTH, LEVEL_HEIGHT);
         camera = new Camera(WIDTH, HEIGHT, LEVEL_WIDTH, LEVEL_HEIGHT, player);
         hud = new HUD();
     }
@@ -62,85 +62,44 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
             e.printStackTrace();
         }
         
-        // Create expanded terrain for a 4000px wide level
-        // Repeating and extending the terrain pattern
+        // Create a clean, single-level platformer with proper spacing
+        // Ground base throughout the level
+        platforms.add(new Platform(0, 700, 3000, 100)); // Main ground
         
-        // SECTION 1: Start area (0-500px)
-        platforms.add(new Platform(0, 675, 100, 125));
-        platforms.add(new Platform(100, 680, 150, 120));
-        platforms.add(new Platform(250, 660, 100, 140));
-        platforms.add(new Platform(350, 640, 170, 160));
-        platforms.add(new Platform(520, 635, 130, 165));
+        // Section 1: Tutorial area (0-300px) - Easy platforming
+        platforms.add(new Platform(150, 600, 150, 50));  // First platform
+        platforms.add(new Platform(350, 550, 150, 50));  // Second platform (higher)
         
-        // SECTION 2: Early challenge (500-1000px)
-        platforms.add(new Platform(500, 650, 190, 150));
-        platforms.add(new Platform(690, 665, 150, 135));
-        platforms.add(new Platform(840, 655, 220, 145));
-        platforms.add(new Platform(1060, 670, 130, 130));
+        // Section 2: Ascending challenge (300-600px)
+        platforms.add(new Platform(450, 600, 120, 50));
+        platforms.add(new Platform(600, 550, 120, 50));
+        platforms.add(new Platform(750, 500, 120, 50));
         
-        // Ground filler section 1
-        platforms.add(new Platform(300, 695, 80, 105));
-        platforms.add(new Platform(700, 695, 90, 105));
+        // Section 3: Peak and descent (600-900px)
+        platforms.add(new Platform(900, 450, 100, 50));  // Peak platform
+        platforms.add(new Platform(1050, 500, 120, 50));
+        platforms.add(new Platform(1200, 550, 120, 50));
         
-        // SECTION 3: Mid-level (1000-1500px)
-        platforms.add(new Platform(1000, 640, 200, 160));
-        platforms.add(new Platform(1200, 660, 150, 140));
-        platforms.add(new Platform(1350, 630, 180, 170));
-        platforms.add(new Platform(1530, 665, 170, 135));
+        // Section 4: Horizontal challenge (900-1200px) - Side-by-side platforms
+        platforms.add(new Platform(1350, 600, 100, 50));
+        platforms.add(new Platform(1500, 600, 100, 50));
+        platforms.add(new Platform(1650, 600, 100, 50));
         
-        // Ground filler section 2
-        platforms.add(new Platform(1100, 695, 100, 105));
+        // Section 5: Staircase up (1200-1500px)
+        platforms.add(new Platform(1800, 550, 120, 50));
+        platforms.add(new Platform(1950, 500, 120, 50));
+        platforms.add(new Platform(2100, 450, 120, 50));
         
-        // SECTION 4: Challenge area (1500-2000px)
-        platforms.add(new Platform(1500, 600, 120, 200));
-        platforms.add(new Platform(1620, 650, 100, 150));
-        platforms.add(new Platform(1720, 620, 110, 180));
-        platforms.add(new Platform(1830, 660, 130, 140));
-        platforms.add(new Platform(1960, 640, 140, 160));
+        // Section 6: Gap challenge (1500-1800px) - Wider spacing
+        platforms.add(new Platform(2250, 500, 100, 50));
+        platforms.add(new Platform(2400, 550, 100, 50));
         
-        // Ground filler section 3
-        platforms.add(new Platform(1550, 695, 85, 105));
-        platforms.add(new Platform(1950, 695, 95, 105));
+        // Section 7: Final climb (1800-2200px)
+        platforms.add(new Platform(2550, 600, 120, 50));
+        platforms.add(new Platform(2700, 550, 120, 50));
         
-        // SECTION 5: Mid-game expansion (2000-2500px)
-        platforms.add(new Platform(2000, 670, 180, 130));
-        platforms.add(new Platform(2180, 645, 160, 155));
-        platforms.add(new Platform(2340, 665, 150, 135));
-        platforms.add(new Platform(2490, 640, 170, 160));
-        
-        // Ground filler section 4
-        platforms.add(new Platform(2100, 695, 100, 105));
-        platforms.add(new Platform(2400, 695, 90, 105));
-        
-        // SECTION 6: Upper challenge (2500-3000px)
-        platforms.add(new Platform(2500, 600, 150, 200));
-        platforms.add(new Platform(2650, 630, 140, 170));
-        platforms.add(new Platform(2790, 655, 130, 145));
-        platforms.add(new Platform(2920, 620, 160, 180));
-        
-        // Ground filler section 5
-        platforms.add(new Platform(2550, 695, 100, 105));
-        platforms.add(new Platform(2850, 695, 95, 105));
-        
-        // SECTION 7: Late game (3000-3500px)
-        platforms.add(new Platform(3000, 665, 170, 135));
-        platforms.add(new Platform(3170, 645, 150, 155));
-        platforms.add(new Platform(3320, 670, 160, 130));
-        platforms.add(new Platform(3480, 640, 140, 160));
-        
-        // Ground filler section 6
-        platforms.add(new Platform(3050, 695, 100, 105));
-        platforms.add(new Platform(3300, 695, 85, 105));
-        
-        // SECTION 8: Final stretch (3500-4000px)
-        platforms.add(new Platform(3500, 620, 180, 180));
-        platforms.add(new Platform(3680, 660, 150, 140));
-        platforms.add(new Platform(3830, 630, 170, 170));
-        platforms.add(new Platform(4000, 675, 100, 125));
-        
-        // Ground filler section 7
-        platforms.add(new Platform(3550, 695, 100, 105));
-        platforms.add(new Platform(3900, 695, 90, 105));
+        // Section 8: Home stretch (2200-3000px)
+        platforms.add(new Platform(2850, 600, 150, 50));
         
         System.out.println("Total platforms created: " + platforms.size());
     }
@@ -189,26 +148,22 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         // Apply camera translation
         g2d.translate(-camera.getX(), -camera.getY());
         
-        // Draw background image tiled across the level
+        // Draw background image tiled horizontally only
         if (backgroundImage != null) {
             int bgWidth = backgroundImage.getWidth();
-            int bgHeight = backgroundImage.getHeight();
             
             // Calculate which tiles to draw based on camera position
             int startX = (camera.getX() / bgWidth) * bgWidth;
-            int startY = (camera.getY() / bgHeight) * bgHeight;
             int endX = startX + WIDTH + bgWidth;
-            int endY = startY + HEIGHT + bgHeight;
             
             for (int x = startX; x < endX; x += bgWidth) {
-                for (int y = startY; y < endY; y += bgHeight) {
-                    g2d.drawImage(backgroundImage, x, y, bgWidth, bgHeight, null);
-                }
+                // Draw background stretched to fit level height, positioned at top
+                g2d.drawImage(backgroundImage, x, 0, bgWidth, LEVEL_HEIGHT, null);
             }
         } else {
             // Fallback: draw solid background
             g2d.setColor(new Color(135, 206, 235));
-            g2d.fillRect(camera.getX(), camera.getY(), WIDTH, HEIGHT);
+            g2d.fillRect(0, 0, LEVEL_WIDTH, LEVEL_HEIGHT);
         }
         
         // Debug: Uncomment to visualize platform hitboxes
