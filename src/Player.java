@@ -266,12 +266,15 @@ public class Player {
         BufferedImage currentSprite = null;
         int drawWidth = width;
         int drawHeight = height;
+        int drawX = x;
 
         // Check if currently jumping
         if (jumping || (velocityY != 0 && !onGround)) {
             // Choose jump sprite based on direction and velocity
             drawWidth = 45; // Smaller width for jump sprites
             drawHeight = 60;
+            // Center the narrower sprite within the hitbox
+            drawX = x + (width - drawWidth) / 2;
             if (velocityY < 0) {
                 // Going up
                 if (facingDirection == Direction.RIGHT) {
@@ -311,10 +314,10 @@ public class Player {
 
         // Draw sprite if loaded, otherwise draw placeholder
         if (currentSprite != null) {
-            g.drawImage(currentSprite, x, y, drawWidth, drawHeight, null);
+            g.drawImage(currentSprite, drawX, y, drawWidth, drawHeight, null);
         } else {
             g.setColor(Color.RED);
-            g.fillRect(x, y, drawWidth, drawHeight);
+            g.fillRect(drawX, y, drawWidth, drawHeight);
         }
         
         // Draw hitbox for debugging (temporary)
