@@ -8,7 +8,6 @@ import java.io.File;
 import javax.imageio.ImageIO;
 import java.util.ArrayList;
 import java.util.List;
-import java.awt.RenderingHints;
 
 public class GamePanel extends JPanel implements KeyListener, Runnable {
     private static final int WIDTH = 1200;
@@ -113,10 +112,10 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
                 System.out.println("HighGround image size: " + highgroundImage.getWidth() + "x" + highgroundImage.getHeight());
                 
                 // Create HighGround obstacles at various positions (moved down by 50)
-                addHighGround(600, 450, highgroundImage.getWidth(), highgroundImage.getHeight());
-                addHighGround(1200, 450, highgroundImage.getWidth(), highgroundImage.getHeight());
-                addHighGround(1800, 450, highgroundImage.getWidth(), highgroundImage.getHeight());
-                addHighGround(2400, 450, highgroundImage.getWidth(), highgroundImage.getHeight());
+                addHighGround(600, 370, (int)(highgroundImage.getWidth() * 2.55), (int)(highgroundImage.getHeight() * 2.55));
+                addHighGround(1200, 370, (int)(highgroundImage.getWidth() * 2.55), (int)(highgroundImage.getHeight() * 2.55));
+                addHighGround(1800, 370, (int)(highgroundImage.getWidth() * 2.55), (int)(highgroundImage.getHeight() * 2.55));
+                addHighGround(2400, 370, (int)(highgroundImage.getWidth() * 2.55), (int)(highgroundImage.getHeight() * 2.55));
                 
                 System.out.println("Total HighGround obstacles created: " + highgrounds.size());
             } else {
