@@ -10,12 +10,15 @@ import java.util.List;
 
 public class Player {
     private List<Platform> platforms;
+    private List<HighGround> highgrounds;
     private int levelWidth;
     private int levelHeight;
     private int x;
     private int y;
-    private int width = 60;
+    private int width = 38;  // Hitbox width (20% less than previous, 20% less than sprite)
     private int height = 60;
+    private int spriteWidth = 60;  // Actual sprite width
+    private int hitboxOffsetX = -5;  // Hitbox offset 5 pixels to the left
     private double velocityX = 0;
     private double velocityY = 0;
     private double maxSpeed = 12.0;
@@ -60,10 +63,11 @@ public class Player {
     private int frameCount = 0;
     private int frameDelay = 2; // Frames per animation frame (lower = faster)
 
-    public Player(int x, int y, List<Platform> platforms, int levelWidth, int levelHeight) {
+    public Player(int x, int y, List<Platform> platforms, List<HighGround> highgrounds, int levelWidth, int levelHeight) {
         this.x = x;
         this.y = y;
         this.platforms = platforms;
+        this.highgrounds = highgrounds;
         this.levelWidth = levelWidth;
         this.levelHeight = levelHeight;
         loadSprites();
@@ -199,11 +203,12 @@ public class Player {
 
         // Check collision with platforms
         onGround = false;
+        int hitboxX = x + hitboxOffsetX;  // Actual hitbox x position
         for (Platform platform : platforms) {
-            if (platform.intersects(x, y, width, height)) {
+            if (platform.intersects(hitboxX, y, width, height)) {
                 // Calculate overlap on each side to determine collision direction
-                int overlapLeft = (x + width) - platform.getX();
-                int overlapRight = (platform.getX() + platform.getWidth()) - x;
+                int overlapLeft = (hitboxX + width) - platform.getX();
+                int overlapRight = (platform.getX() + platform.getWidth()) - hitboxX;
                 int overlapTop = (y + height) - platform.getY();
                 int overlapBottom = (platform.getY() + platform.getHeight()) - y;
                 
@@ -224,10 +229,44 @@ public class Player {
                     velocityY = 0;
                 } else if (minOverlap == overlapLeft) {
                     // Hitting platform from the left side
-                    x = platform.getX() - width;
+                    x = platform.getX() - width - hitboxOffsetX;
                 } else if (minOverlap == overlapRight) {
                     // Hitting platform from the right side
-                    x = platform.getX() + platform.getWidth();
+                    x = platform.getX() + platform.getWidth() - hitboxOffsetX;
+                }
+            }
+        }
+        
+        // Check collision with HighGround obstacles (with velocity awareness)
+        for (HighGround highground : highgrounds) {
+            if (highground.intersectsWithVelocity(hitboxX, y, width, height, velocityY)) {
+                // Calculate overlap on each side to determine collision direction
+                int overlapLeft = (hitboxX + width) - highground.getX();
+                int overlapRight = (highground.getX() + highground.getWidth()) - hitboxX;
+                int overlapTop = (y + height) - highground.getY();
+                int overlapBottom = (highground.getY() + highground.getHitboxHeight()) - y;
+                
+                // Find the minimum overlap to determine which side was hit
+                int minOverlap = Math.min(Math.min(overlapLeft, overlapRight), Math.min(overlapTop, overlapBottom));
+                
+                if (minOverlap == overlapTop && velocityY > 0) {
+                    // Landing on top of HighGround
+                    y = highground.getY() - height;
+                    velocityY = 0;
+                    onGround = true;
+                    jumping = false;
+                    jumpKeyPressed = false;
+                    jumpKeyHeldFrames = 0;
+                } else if (minOverlap == overlapBottom && velocityY < 0) {
+                    // Hitting head on HighGround
+                    y = highground.getY() + highground.getHitboxHeight();
+                    velocityY = 0;
+                } else if (minOverlap == overlapLeft) {
+                    // Hitting HighGround from the left side
+                    x = highground.getX() - width - hitboxOffsetX;
+                } else if (minOverlap == overlapRight) {
+                    // Hitting HighGround from the right side
+                    x = highground.getX() + highground.getWidth() - hitboxOffsetX;
                 }
             }
         }
@@ -258,15 +297,16 @@ public class Player {
             jumpBufferCounter--;
         }
 
-        if (x < 0) x = 0;
-        if (x + width > levelWidth) x = levelWidth - width;
+        // Boundary checks for visual position
+        if (x < -hitboxOffsetX) x = -hitboxOffsetX;
+        if (x + width + hitboxOffsetX > levelWidth) x = levelWidth - width - hitboxOffsetX;
     }
 
     public void draw(Graphics2D g) {
         BufferedImage currentSprite = null;
-        int drawWidth = width;
+        int drawWidth = spriteWidth;
         int drawHeight = height;
-        int drawX = x;
+        int drawX = x + (width - spriteWidth) / 2;  // Center sprite within hitbox
 
         // Check if currently jumping
         if (jumping || (velocityY != 0 && !onGround)) {
@@ -303,6 +343,7 @@ public class Player {
                     currentSprite = runningLeftFrames.get(frameIndex);
                 }
             }
+            drawX = x + (width - spriteWidth) / 2;  // Center sprite within hitbox
         } else {
             // Idle
             if (facingDirection == Direction.RIGHT) {
@@ -310,6 +351,7 @@ public class Player {
             } else {
                 currentSprite = idleLeft;
             }
+            drawX = x + (width - spriteWidth) / 2;  // Center sprite within hitbox
         }
 
         // Draw sprite if loaded, otherwise draw placeholder
@@ -321,11 +363,12 @@ public class Player {
         }
         
         // Draw hitbox for debugging (temporary)
+        int debugHitboxX = x + hitboxOffsetX;
         g.setColor(new Color(255, 0, 0, 100)); // Semi-transparent red
-        g.fillRect(x, y, width, height);
+        g.fillRect(debugHitboxX, y, width, height);
         g.setColor(Color.RED);
         g.setStroke(new BasicStroke(2));
-        g.drawRect(x, y, width, height);
+        g.drawRect(debugHitboxX, y, width, height);
     }
 
     public void handleKeyPress(int keyCode) {

@@ -23,8 +23,10 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
     private boolean running = false;
     
     private BufferedImage floorImage;
+    private BufferedImage highgroundImage;
     private List<Floor> floors;
     private List<Platform> platforms;
+    private List<HighGround> highgrounds;
 
     public GamePanel() {
         setPreferredSize(new Dimension(WIDTH, HEIGHT));
@@ -34,9 +36,10 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         
         floors = new ArrayList<>();
         platforms = new ArrayList<>();
+        highgrounds = new ArrayList<>();
         loadFloorsAndPlatforms();
 
-        player = new Player(50, 620, platforms, LEVEL_WIDTH, LEVEL_HEIGHT);
+        player = new Player(50, 620, platforms, highgrounds, LEVEL_WIDTH, LEVEL_HEIGHT);
         camera = new Camera(WIDTH, HEIGHT, LEVEL_WIDTH, LEVEL_HEIGHT, player);
         hud = new HUD();
     }
@@ -88,6 +91,45 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         
         System.out.println("Total floor sections created: " + floors.size());
         System.out.println("Total collision platforms created: " + platforms.size());
+        
+        // Load and create HighGround obstacles
+        loadHighGroundObstacles();
+    }
+    
+    private void loadHighGroundObstacles() {
+        try {
+            File assetsDir = new File("assets");
+            if (!assetsDir.exists()) {
+                assetsDir = new File("./assets");
+            }
+            if (!assetsDir.exists()) {
+                assetsDir = new File(System.getProperty("user.dir") + "/assets");
+            }
+            
+            File highgroundFile = new File(assetsDir, "highground.png");
+            if (highgroundFile.exists()) {
+                highgroundImage = ImageIO.read(highgroundFile);
+                System.out.println("HighGround image loaded: " + highgroundFile.getAbsolutePath());
+                System.out.println("HighGround image size: " + highgroundImage.getWidth() + "x" + highgroundImage.getHeight());
+                
+                // Create HighGround obstacles at various positions (moved down by 50)
+                addHighGround(600, 450, highgroundImage.getWidth(), highgroundImage.getHeight());
+                addHighGround(1200, 450, highgroundImage.getWidth(), highgroundImage.getHeight());
+                addHighGround(1800, 450, highgroundImage.getWidth(), highgroundImage.getHeight());
+                addHighGround(2400, 450, highgroundImage.getWidth(), highgroundImage.getHeight());
+                
+                System.out.println("Total HighGround obstacles created: " + highgrounds.size());
+            } else {
+                System.out.println("HighGround image not found at: " + highgroundFile.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading HighGround image: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void addHighGround(int x, int y, int width, int height) {
+        highgrounds.add(new HighGround(x, y, width, height, highgroundImage));
     }
     
     private void addFloorSection(int x, int y, int renderWidth, int hitboxWidth, int height) {
@@ -144,6 +186,11 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
             floor.draw(g2d);
         }
         
+        // Draw HighGround obstacles
+        for (HighGround hg : highgrounds) {
+            hg.draw(g2d);
+        }
+        
         // Draw floor hitboxes for debugging
         for (Platform p : platforms) {
             g2d.setColor(new Color(0, 255, 0, 100)); // Semi-transparent green
@@ -151,6 +198,16 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
             g2d.setColor(Color.GREEN);
             g2d.setStroke(new BasicStroke(2));
             g2d.drawRect(p.getX(), p.getY(), p.getWidth(), p.getHeight());
+        }
+        
+        // Draw HighGround hitboxes for debugging
+        for (HighGround hg : highgrounds) {
+            int hitboxHeight = hg.getHitboxHeight();
+            g2d.setColor(new Color(255, 165, 0, 100)); // Semi-transparent orange
+            g2d.fillRect(hg.getX(), hg.getY(), hg.getWidth(), hitboxHeight);
+            g2d.setColor(new Color(255, 165, 0));
+            g2d.setStroke(new BasicStroke(2));
+            g2d.drawRect(hg.getX(), hg.getY(), hg.getWidth(), hitboxHeight);
         }
 
         player.draw(g2d);
