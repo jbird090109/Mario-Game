@@ -2,7 +2,7 @@ import java.awt.image.BufferedImage;
 
 public class HighGround extends Obstacles {
     // Only top 1/5th of the image has a hitbox
-    private static final double HITBOX_HEIGHT_RATIO = 0.2; // Top 1/5th
+    private static final double HITBOX_HEIGHT_RATIO = 0.05; // Top 1/5th
     
     public HighGround(int x, int y, int width, int height, BufferedImage image) {
         super(x, y, width, height, image);
