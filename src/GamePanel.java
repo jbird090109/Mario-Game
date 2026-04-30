@@ -6,13 +6,15 @@ import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.File; 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 public class GamePanel extends JPanel implements KeyListener, Runnable {
     private static final int WIDTH = 1200;
     private static final int HEIGHT = 800;
-    private static final int LEVEL_WIDTH = 3000;  // Single horizontal level
+    private static final int LEVEL_WIDTH = 15000;  // Extended to 5x longer
     private static final int LEVEL_HEIGHT = 800;  // Match viewport height to prevent tiling
 
     private Player player;
@@ -23,9 +25,12 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
     
     private BufferedImage floorImage;
     private BufferedImage highgroundImage;
+    private List<BufferedImage> luckyBlockFrames;
     private List<Floor> floors;
     private List<Platform> platforms;
     private List<HighGround> highgrounds;
+    private List<LuckyBlock> luckyBlocks;
+    private java.util.Random random;
 
     public GamePanel() {
         setPreferredSize(new Dimension(WIDTH, HEIGHT));
@@ -36,9 +41,12 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         floors = new ArrayList<>();
         platforms = new ArrayList<>();
         highgrounds = new ArrayList<>();
+        luckyBlocks = new ArrayList<>();
+        luckyBlockFrames = new ArrayList<>();
+        random = new java.util.Random();
         loadFloorsAndPlatforms();
 
-        player = new Player(50, 620, platforms, highgrounds, LEVEL_WIDTH, LEVEL_HEIGHT);
+        player = new Player(50, 620, platforms, highgrounds, luckyBlocks, LEVEL_WIDTH, LEVEL_HEIGHT);
         camera = new Camera(WIDTH, HEIGHT, LEVEL_WIDTH, LEVEL_HEIGHT, player);
         hud = new HUD();
     }
@@ -67,32 +75,27 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
             e.printStackTrace();
         }
         
-        // Create a line of floor sections with gaps in between
-        // Floor dimensions - render width is the full image, but hitbox width is smaller to create gaps
+        // Create a repeating pattern of floor sections across entire map
         int renderWidth = floorImage != null ? floorImage.getWidth() : 100;
-        int hitboxWidth = (int)(renderWidth); // Reduce hitbox to 70% of render width
+        int hitboxWidth = renderWidth;
         int renderHeight = floorImage != null ? floorImage.getHeight() : 50;
-        int floorY = 650; // Floor Y position
+        int floorY = 650;
         
-        // Section 1: Tutorial area with gaps
-        addFloorSection(0, floorY, renderWidth, hitboxWidth, renderHeight);
-        addFloorSection(renderWidth + 180, floorY, renderWidth, hitboxWidth, renderHeight); // Gap of 180px
-        addFloorSection((renderWidth + 180) * 2 + 70, floorY, renderWidth, hitboxWidth, renderHeight); // Larger gap
-        
-        // Section 2: Mid-level with varied gaps
-        addFloorSection((renderWidth + 180) * 3 + 240, floorY, renderWidth, hitboxWidth, renderHeight); // Even bigger gap
-        addFloorSection((renderWidth + 180) * 4, floorY, renderWidth, hitboxWidth, renderHeight); // Normal gap
-        addFloorSection((renderWidth + 180) * 5 + 320, floorY, renderWidth, hitboxWidth, renderHeight); // Very large gap
-        
-        // Section 3: Final sections
-        addFloorSection((renderWidth + 180) * 6 + 140, floorY, renderWidth, hitboxWidth, renderHeight);
-        addFloorSection((renderWidth + 180) * 7 + 260, floorY, renderWidth, hitboxWidth, renderHeight);
+        // Fill the entire extended map with floor sections
+        int x = 0;
+        while (x < LEVEL_WIDTH) {
+            addFloorSection(x, floorY, renderWidth, hitboxWidth, renderHeight);
+            x += renderWidth + 180; // Floor + gap pattern
+        }
         
         System.out.println("Total floor sections created: " + floors.size());
         System.out.println("Total collision platforms created: " + platforms.size());
         
         // Load and create HighGround obstacles
         loadHighGroundObstacles();
+        
+        // Load and create LuckyBlock obstacles (after highgrounds)
+        loadLuckyBlockObstacles();
     }
     
     private void loadHighGroundObstacles() {
@@ -111,11 +114,14 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
                 System.out.println("HighGround image loaded: " + highgroundFile.getAbsolutePath());
                 System.out.println("HighGround image size: " + highgroundImage.getWidth() + "x" + highgroundImage.getHeight());
                 
-                // Create HighGround obstacles at various positions (moved down by 50)
-                addHighGround(600, 370, (int)(highgroundImage.getWidth() * 2.55), (int)(highgroundImage.getHeight() * 2.55));
-                addHighGround(1200, 370, (int)(highgroundImage.getWidth() * 2.55), (int)(highgroundImage.getHeight() * 2.55));
-                addHighGround(1800, 370, (int)(highgroundImage.getWidth() * 2.55), (int)(highgroundImage.getHeight() * 2.55));
-                addHighGround(2400, 370, (int)(highgroundImage.getWidth() * 2.55), (int)(highgroundImage.getHeight() * 2.55));
+                int hgWidth = (int)(highgroundImage.getWidth() * 2.55);
+                int hgHeight = (int)(highgroundImage.getHeight() * 2.55);
+                
+                // Generate highgrounds at random intervals throughout the extended map
+                for (int xPos = 600; xPos < LEVEL_WIDTH; xPos += 500 + random.nextInt(400)) {
+                    int yPos = 300 + random.nextInt(150); // Random Y in range
+                    addHighGround(xPos, yPos, hgWidth, hgHeight);
+                }
                 
                 System.out.println("Total HighGround obstacles created: " + highgrounds.size());
             } else {
@@ -129,6 +135,76 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
     
     private void addHighGround(int x, int y, int width, int height) {
         highgrounds.add(new HighGround(x, y, width, height, highgroundImage));
+    }
+    
+    private void loadGifFrames(File gifFile, List<BufferedImage> frameList) {
+        try {
+            ImageInputStream iis = ImageIO.createImageInputStream(gifFile);
+            ImageReader reader = ImageIO.getImageReadersByFormatName("gif").next();
+            reader.setInput(iis, false);
+            
+            int frameCount = reader.getNumImages(true);
+            System.out.println("Loading " + gifFile.getName() + " with " + frameCount + " frames");
+            
+            for (int i = 0; i < frameCount; i++) {
+                BufferedImage frame = reader.read(i);
+                System.out.println("  Frame " + i + ": " + frame.getWidth() + "x" + frame.getHeight());
+                frameList.add(frame);
+            }
+            reader.dispose();
+            iis.close();
+        } catch (Exception e) {
+            System.err.println("Error loading GIF frames from " + gifFile.getName() + ": " + e.getMessage());
+        }
+    }
+    
+    private void loadLuckyBlockObstacles() {
+        try {
+            File assetsDir = new File("assets");
+            if (!assetsDir.exists()) {
+                assetsDir = new File("./assets");
+            }
+            if (!assetsDir.exists()) {
+                assetsDir = new File(System.getProperty("user.dir") + "/assets");
+            }
+            
+            File luckyBlockFile = new File(assetsDir, "QuestionBlock.gif");
+            if (luckyBlockFile.exists()) {
+                loadGifFrames(luckyBlockFile, luckyBlockFrames);
+                System.out.println("LuckyBlock animation frames loaded: " + luckyBlockFrames.size() + " frames");
+                
+                int blockSize = 50;
+                
+                // Generate lucky blocks at random intervals with ~5% frequency
+                for (int xPos = 800; xPos < LEVEL_WIDTH; xPos += 2000 + random.nextInt(1500)) {
+                    int yPos = 250 + random.nextInt(150);
+                    addLuckyBlockIfNoHighgroundIntersection(xPos, yPos, blockSize, blockSize);
+                }
+                
+                System.out.println("Total LuckyBlock obstacles created: " + luckyBlocks.size());
+            } else {
+                System.out.println("LuckyBlock image not found at: " + luckyBlockFile.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading LuckyBlock image: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void addLuckyBlockIfNoHighgroundIntersection(int x, int y, int width, int height) {
+        // Check if this lucky block would intersect with any highground's hitbox
+        for (HighGround hg : highgrounds) {
+            if (checkIntersection(x, y, width, height, hg.getX(), hg.getY(), hg.getWidth(), hg.getHeight())) {
+                // Intersection found, skip this lucky block
+                return;
+            }
+        }
+        // No intersection, add the lucky block
+        luckyBlocks.add(new LuckyBlock(x, y, width, height, luckyBlockFrames));
+    }
+    
+    private boolean checkIntersection(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
+        return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
     }
     
     private void addFloorSection(int x, int y, int renderWidth, int hitboxWidth, int height) {
@@ -166,6 +242,9 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         player.update();
         camera.update();
         hud.update();
+        for (LuckyBlock lb : luckyBlocks) {
+            lb.update();
+        }
     }
 
     @Override
@@ -190,6 +269,11 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
             hg.draw(g2d);
         }
         
+        // Draw LuckyBlock obstacles
+        for (LuckyBlock lb : luckyBlocks) {
+            lb.draw(g2d);
+        }
+        
         // Draw floor hitboxes for debugging
         for (Platform p : platforms) {
             g2d.setColor(new Color(0, 255, 0, 100)); // Semi-transparent green
@@ -207,6 +291,15 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
             g2d.setColor(new Color(255, 165, 0));
             g2d.setStroke(new BasicStroke(2));
             g2d.drawRect(hg.getX(), hg.getY(), hg.getWidth(), hitboxHeight);
+        }
+        
+        // Draw LuckyBlock hitboxes for debugging
+        for (LuckyBlock lb : luckyBlocks) {
+            g2d.setColor(new Color(255, 215, 0, 100)); // Semi-transparent gold
+            g2d.fillRect(lb.getX(), lb.getY(), lb.getWidth(), lb.getHeight());
+            g2d.setColor(new Color(255, 215, 0));
+            g2d.setStroke(new BasicStroke(2));
+            g2d.drawRect(lb.getX(), lb.getY(), lb.getWidth(), lb.getHeight());
         }
 
         player.draw(g2d);

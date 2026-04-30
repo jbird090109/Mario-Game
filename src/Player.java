@@ -11,6 +11,7 @@ import java.util.List;
 public class Player {
     private List<Platform> platforms;
     private List<HighGround> highgrounds;
+    private List<LuckyBlock> luckyBlocks;
     private int levelWidth;
     private int levelHeight;
     private int x;
@@ -63,11 +64,12 @@ public class Player {
     private int frameCount = 0;
     private int frameDelay = 2; // Frames per animation frame (lower = faster)
 
-    public Player(int x, int y, List<Platform> platforms, List<HighGround> highgrounds, int levelWidth, int levelHeight) {
+    public Player(int x, int y, List<Platform> platforms, List<HighGround> highgrounds, List<LuckyBlock> luckyBlocks, int levelWidth, int levelHeight) {
         this.x = x;
         this.y = y;
         this.platforms = platforms;
         this.highgrounds = highgrounds;
+        this.luckyBlocks = luckyBlocks;
         this.levelWidth = levelWidth;
         this.levelHeight = levelHeight;
         loadSprites();
@@ -267,6 +269,40 @@ public class Player {
                 } else if (minOverlap == overlapRight) {
                     // Hitting HighGround from the right side
                     x = highground.getX() + highground.getWidth() - hitboxOffsetX;
+                }
+            }
+        }
+        
+        // Check collision with LuckyBlock obstacles (normal square hitboxes)
+        for (LuckyBlock luckyBlock : luckyBlocks) {
+            if (luckyBlock.intersects(hitboxX, y, width, height)) {
+                // Calculate overlap on each side to determine collision direction
+                int overlapLeft = (hitboxX + width) - luckyBlock.getX();
+                int overlapRight = (luckyBlock.getX() + luckyBlock.getWidth()) - hitboxX;
+                int overlapTop = (y + height) - luckyBlock.getY();
+                int overlapBottom = (luckyBlock.getY() + luckyBlock.getHeight()) - y;
+                
+                // Find the minimum overlap to determine which side was hit
+                int minOverlap = Math.min(Math.min(overlapLeft, overlapRight), Math.min(overlapTop, overlapBottom));
+                
+                if (minOverlap == overlapTop && velocityY > 0) {
+                    // Landing on top of LuckyBlock
+                    y = luckyBlock.getY() - height;
+                    velocityY = 0;
+                    onGround = true;
+                    jumping = false;
+                    jumpKeyPressed = false;
+                    jumpKeyHeldFrames = 0;
+                } else if (minOverlap == overlapBottom && velocityY < 0) {
+                    // Hitting head on LuckyBlock
+                    y = luckyBlock.getY() + luckyBlock.getHeight();
+                    velocityY = 0;
+                } else if (minOverlap == overlapLeft) {
+                    // Hitting LuckyBlock from the left side
+                    x = luckyBlock.getX() - width - hitboxOffsetX;
+                } else if (minOverlap == overlapRight) {
+                    // Hitting LuckyBlock from the right side
+                    x = luckyBlock.getX() + luckyBlock.getWidth() - hitboxOffsetX;
                 }
             }
         }
