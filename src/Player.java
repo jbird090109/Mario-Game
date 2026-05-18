@@ -1,465 +1,310 @@
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
-import java.util.ArrayList;
-import java.util.List;
 
 public class Player {
-    private List<Platform> platforms;
-    private List<HighGround> highgrounds;
-    private List<LuckyBlock> luckyBlocks;
-    private int levelWidth;
-    private int levelHeight;
-    private int x;
-    private int y;
-    private int width = 38;  // Hitbox width (20% less than previous, 20% less than sprite)
-    private int height = 60;
-    private int spriteWidth = 60;  // Actual sprite width
-    private int hitboxOffsetX = -5;  // Hitbox offset 5 pixels to the left
-    private double velocityX = 0;
-    private double velocityY = 0;
-    private double maxSpeed = 12.0;
-    private double acceleration = 1.5;
-    private double friction = 0.85; // Slide/deceleration factor (0-1)
-    private double gravityAscent = 1.50; // Gravity while ascending
-    private double gravityDescent = 1.8; // Gravity while descending - faster fall
-    private boolean jumping = false;
-    private boolean onGround = false;
+    private final GameState state;
 
-    private boolean leftPressed = false;
-    private boolean rightPressed = false;
+    private double x = 48;
+    private double y = 0;
+    private double velX;
+    private double velY;
+    private double prevVelY;
+    private boolean onGround;
+    private boolean jumping;
+    private boolean jumpHeld;
+    private int jumpHoldFrames;
 
-    // Sprite images
-    private BufferedImage idleRight;
-    private BufferedImage idleLeft;
-    private List<BufferedImage> runningRightFrames = new ArrayList<>();
-    private List<BufferedImage> runningLeftFrames = new ArrayList<>();
-    
-    // Jump sprites
-    private BufferedImage jumpUpRight;
-    private BufferedImage jumpUpLeft;
-    private BufferedImage jumpDownRight;
-    private BufferedImage jumpDownLeft;
-    
-    private int currentRunningFrame = 0;
-    
-    // Jump variables (Super Mario World style)
-    private boolean jumpKeyPressed = false;
-    private int jumpKeyHeldFrames = 0;
-    private int maxJumpKeyFrames = 14; // Duration to hold button for max height
-    private int jumpBufferCounter = 0; // Jump input buffering for responsive jumps
-    private int jumpBufferWindow = 6; // Frames to buffer jump input (100ms at 60fps)
+    private boolean left;
+    private boolean right;
+    private boolean runKey;
+    private int jumpBuffer;
 
-    // Direction tracking
-    private enum Direction {
-        LEFT, RIGHT
-    }
-    private Direction facingDirection = Direction.RIGHT;
+    private boolean facingRight = true;
+    private boolean big;
+    private boolean fire;
+    private boolean dead;
+    private int animFrame;
+    private int speedOscIndex;
+    private int pMeter;
 
-    // Animation tracking
-    private int frameCount = 0;
-    private int frameDelay = 2; // Frames per animation frame (lower = faster)
+    private static final int HITBOX_W = SmwConstants.MARIO_W;
+    private static final int HITBOX_OFFSET = 1;
+    private static final int SPRITE_W = 16;
 
-    public Player(int x, int y, List<Platform> platforms, List<HighGround> highgrounds, List<LuckyBlock> luckyBlocks, int levelWidth, int levelHeight) {
-        this.x = x;
-        this.y = y;
-        this.platforms = platforms;
-        this.highgrounds = highgrounds;
-        this.luckyBlocks = luckyBlocks;
-        this.levelWidth = levelWidth;
-        this.levelHeight = levelHeight;
-        loadSprites();
+    public Player(GameState state, int startY) {
+        this.state = state;
+        this.y = startY;
     }
 
-    private void loadSprites() {
-        try {
-            // Try multiple path options to handle different working directories
-            File assetsDir = new File("assets");
-            if (!assetsDir.exists()) {
-                assetsDir = new File("./assets");
-            }
-            if (!assetsDir.exists()) {
-                // Try from project root when running from IDE
-                assetsDir = new File(System.getProperty("user.dir") + "/assets");
-            }
-            
-            idleRight = ImageIO.read(new File(assetsDir, "Right.png"));
-            idleLeft = ImageIO.read(new File(assetsDir, "Left.png"));
-            
-            // Load GIF animations with all frames
-            loadGifFrames(new File(assetsDir, "Running Right.gif"), runningRightFrames);
-            loadGifFrames(new File(assetsDir, "Running Left.gif"), runningLeftFrames);
-            
-            // Load jump sprites
-            jumpUpRight = ImageIO.read(new File(assetsDir, "jumpingupright.png"));
-            jumpUpLeft = ImageIO.read(new File(assetsDir, "jumpingupleft.png"));
-            jumpDownRight = ImageIO.read(new File(assetsDir, "jumpingrightdown.png"));
-            jumpDownLeft = ImageIO.read(new File(assetsDir, "jumpingleftdown.png"));
-            
-            if (idleRight != null) {
-                System.out.println("Sprites loaded successfully from: " + assetsDir.getAbsolutePath());
-                System.out.println("Idle Right: " + (idleRight != null));
-                System.out.println("Idle Left: " + (idleLeft != null));
-                System.out.println("Running Right frames: " + runningRightFrames.size());
-                System.out.println("Running Left frames: " + runningLeftFrames.size());
-                System.out.println("Jump Up Right: " + (jumpUpRight != null));
-                System.out.println("Jump Up Left: " + (jumpUpLeft != null));
-                System.out.println("Jump Down Right: " + (jumpDownRight != null));
-                System.out.println("Jump Down Left: " + (jumpDownLeft != null));
-            }
-        } catch (Exception e) {
-            System.err.println("Error loading sprites: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-    
-    private void loadGifFrames(File gifFile, List<BufferedImage> frameList) {
-        try {
-            ImageInputStream iis = ImageIO.createImageInputStream(gifFile);
-            ImageReader reader = ImageIO.getImageReadersByFormatName("gif").next();
-            reader.setInput(iis, false);
-            
-            int frameCount = reader.getNumImages(true);
-            System.out.println("Loading " + gifFile.getName() + " with " + frameCount + " frames");
-            
-            for (int i = 0; i < frameCount; i++) {
-                BufferedImage frame = reader.read(i);
-                System.out.println("  Frame " + i + ": " + frame.getWidth() + "x" + frame.getHeight());
-                
-                // Scale all frames to a consistent size (155x155 like idle sprites)
-                BufferedImage scaledFrame = new BufferedImage(155, 155, BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g2d = scaledFrame.createGraphics();
-                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-                g2d.drawImage(frame, 0, 0, 155, 155, null);
-                g2d.dispose();
-                frameList.add(scaledFrame);
-            }
-            reader.dispose();
-            iis.close();
-        } catch (Exception e) {
-            System.err.println("Error loading GIF frames from " + gifFile.getName() + ": " + e.getMessage());
-        }
+    public GameState getState() {
+        return state;
     }
 
     public void update() {
-        // Momentum-based movement with acceleration and friction
-        // Reduce control when in the air (air strafing is slower)
-        double currentAcceleration = onGround ? acceleration : acceleration * 0.5;
-        double currentMaxSpeed = onGround ? maxSpeed : maxSpeed * 0.9;
-        
-        if (leftPressed) {
-            velocityX -= currentAcceleration;
-            if (velocityX < -currentMaxSpeed) velocityX = -currentMaxSpeed;
-            facingDirection = Direction.LEFT;
-        } else if (rightPressed) {
-            velocityX += currentAcceleration;
-            if (velocityX > currentMaxSpeed) velocityX = currentMaxSpeed;
-            facingDirection = Direction.RIGHT;
+        if (dead) {
+            velY += SmwConstants.GRAVITY_DESCENT;
+            y += velY;
+            return;
+        }
+
+        double maxSpeed = SmwConstants.WALK_MAX;
+        double accel = SmwConstants.WALK_ACCEL;
+        boolean sprinting = runKey && pMeter >= SmwConstants.P_METER_MAX;
+
+        if (runKey && onGround) {
+            pMeter = Math.min(SmwConstants.P_METER_MAX, pMeter + SmwConstants.P_METER_RUN);
+        } else if (!onGround && runKey) {
+            pMeter = Math.min(SmwConstants.P_METER_MAX, pMeter + 1);
+        } else if (onGround) {
+            pMeter = Math.max(0, pMeter - 2);
+        }
+
+        if (sprinting) {
+            maxSpeed = SmwConstants.SPRINT_SPEEDS[speedOscIndex % 5] / 16.0;
+            accel = SmwConstants.RUN_ACCEL;
+            if (onGround && (left || right)) {
+                speedOscIndex++;
+            }
+        } else if (runKey) {
+            maxSpeed = SmwConstants.RUN_MAX;
+            accel = SmwConstants.RUN_ACCEL;
+        }
+
+        if (left) {
+            velX -= accel;
+            facingRight = false;
+        } else if (right) {
+            velX += accel;
+            facingRight = true;
+        } else if (onGround) {
+            velX *= SmwConstants.FRICTION_GROUND;
         } else {
-            // Apply friction when no key is pressed (sliding effect)
-            velocityX *= friction;
-            // Stop completely if very slow
-            if (Math.abs(velocityX) < 0.1) {
-                velocityX = 0;
-            }
+            velX *= SmwConstants.FRICTION_AIR;
         }
 
-        // Track max jump hold time (no longer needed for accumulation, just for feedback)
-        if (jumpKeyPressed && jumpKeyHeldFrames < maxJumpKeyFrames) {
-            jumpKeyHeldFrames++;
+        if (velX > maxSpeed) {
+            velX = maxSpeed;
+        }
+        if (velX < -maxSpeed) {
+            velX = -maxSpeed;
+        }
+        if (Math.abs(velX) < 0.05) {
+            velX = 0;
         }
 
-        // Apply variable gravity based on jump phase (classic Mario physics)
-        if (!onGround) {
-            if (jumpKeyPressed && velocityY < 0) {
-                // While holding jump button AND ascending - reduced gravity for variable height
-                // This allows jumping higher by holding, and lower if released early
-                velocityY += gravityAscent * 0.5; // Reduced gravity extends hang time
-            } else if (velocityY < 0) {
-                // Ascending without holding jump button - normal ascent gravity
-                velocityY += gravityAscent;
-            } else {
-                // Descending - normal gravity
-                velocityY += gravityDescent;
-            }
+        if (jumpHeld && jumpHoldFrames < SmwConstants.JUMP_HOLD_FRAMES && velY < 0) {
+            velY += SmwConstants.JUMP_HOLD_GRAVITY;
+            jumpHoldFrames++;
+        } else if (velY < 0) {
+            velY += SmwConstants.GRAVITY_ASCENT;
+        } else if (!onGround) {
+            velY += SmwConstants.GRAVITY_DESCENT;
         }
 
-        // Update animation frame counter for running animations
-        frameCount++;
-        if (frameCount > 255) {
-            frameCount = 0; // Reset to keep it manageable
-        }
-        
-        // Advance to next frame every frameDelay updates
-        if (frameCount % frameDelay == 0) {
-            currentRunningFrame++;
-        }
+        onGround = TileCollision.resolve(this, state.level);
 
-        x += (int) velocityX;
-
-        y += velocityY;
-
-        // Check collision with platforms
-        onGround = false;
-        int hitboxX = x + hitboxOffsetX;  // Actual hitbox x position
-        for (Platform platform : platforms) {
-            if (platform.intersects(hitboxX, y, width, height)) {
-                // Calculate overlap on each side to determine collision direction
-                int overlapLeft = (hitboxX + width) - platform.getX();
-                int overlapRight = (platform.getX() + platform.getWidth()) - hitboxX;
-                int overlapTop = (y + height) - platform.getY();
-                int overlapBottom = (platform.getY() + platform.getHeight()) - y;
-                
-                // Find the minimum overlap to determine which side was hit
-                int minOverlap = Math.min(Math.min(overlapLeft, overlapRight), Math.min(overlapTop, overlapBottom));
-                
-                if (minOverlap == overlapTop && velocityY > 0) {
-                    // Landing on top of platform
-                    y = platform.getY() - height;
-                    velocityY = 0;
-                    onGround = true;
-                    jumping = false;
-                    jumpKeyPressed = false;
-                    jumpKeyHeldFrames = 0;
-                } else if (minOverlap == overlapBottom && velocityY < 0) {
-                    // Hitting head on platform
-                    y = platform.getY() + platform.getHeight();
-                    velocityY = 0;
-                } else if (minOverlap == overlapLeft) {
-                    // Hitting platform from the left side
-                    x = platform.getX() - width - hitboxOffsetX;
-                } else if (minOverlap == overlapRight) {
-                    // Hitting platform from the right side
-                    x = platform.getX() + platform.getWidth() - hitboxOffsetX;
-                }
-            }
-        }
-        
-        // Check collision with HighGround obstacles (with velocity awareness)
-        for (HighGround highground : highgrounds) {
-            if (highground.intersectsWithVelocity(hitboxX, y, width, height, velocityY)) {
-                // Calculate overlap on each side to determine collision direction
-                int overlapLeft = (hitboxX + width) - highground.getX();
-                int overlapRight = (highground.getX() + highground.getWidth()) - hitboxX;
-                int overlapTop = (y + height) - highground.getY();
-                int overlapBottom = (highground.getY() + highground.getHitboxHeight()) - y;
-                
-                // Find the minimum overlap to determine which side was hit
-                int minOverlap = Math.min(Math.min(overlapLeft, overlapRight), Math.min(overlapTop, overlapBottom));
-                
-                if (minOverlap == overlapTop && velocityY > 0) {
-                    // Landing on top of HighGround
-                    y = highground.getY() - height;
-                    velocityY = 0;
-                    onGround = true;
-                    jumping = false;
-                    jumpKeyPressed = false;
-                    jumpKeyHeldFrames = 0;
-                } else if (minOverlap == overlapBottom && velocityY < 0) {
-                    // Hitting head on HighGround
-                    y = highground.getY() + highground.getHitboxHeight();
-                    velocityY = 0;
-                } else if (minOverlap == overlapLeft) {
-                    // Hitting HighGround from the left side
-                    x = highground.getX() - width - hitboxOffsetX;
-                } else if (minOverlap == overlapRight) {
-                    // Hitting HighGround from the right side
-                    x = highground.getX() + highground.getWidth() - hitboxOffsetX;
-                }
-            }
-        }
-        
-        // Check collision with LuckyBlock obstacles (normal square hitboxes)
-        for (LuckyBlock luckyBlock : luckyBlocks) {
-            if (luckyBlock.intersects(hitboxX, y, width, height)) {
-                // Calculate overlap on each side to determine collision direction
-                int overlapLeft = (hitboxX + width) - luckyBlock.getX();
-                int overlapRight = (luckyBlock.getX() + luckyBlock.getWidth()) - hitboxX;
-                int overlapTop = (y + height) - luckyBlock.getY();
-                int overlapBottom = (luckyBlock.getY() + luckyBlock.getHeight()) - y;
-                
-                // Find the minimum overlap to determine which side was hit
-                int minOverlap = Math.min(Math.min(overlapLeft, overlapRight), Math.min(overlapTop, overlapBottom));
-                
-                if (minOverlap == overlapTop && velocityY > 0) {
-                    // Landing on top of LuckyBlock
-                    y = luckyBlock.getY() - height;
-                    velocityY = 0;
-                    onGround = true;
-                    jumping = false;
-                    jumpKeyPressed = false;
-                    jumpKeyHeldFrames = 0;
-                } else if (minOverlap == overlapBottom && velocityY < 0) {
-                    // Hitting head on LuckyBlock
-                    y = luckyBlock.getY() + luckyBlock.getHeight();
-                    velocityY = 0;
-                } else if (minOverlap == overlapLeft) {
-                    // Hitting LuckyBlock from the left side
-                    x = luckyBlock.getX() - width - hitboxOffsetX;
-                } else if (minOverlap == overlapRight) {
-                    // Hitting LuckyBlock from the right side
-                    x = luckyBlock.getX() + luckyBlock.getWidth() - hitboxOffsetX;
-                }
-            }
-        }
-        
-        // Fallback to hard ground
-        int hardGroundLevel = levelHeight - 0; // Safety platform near bottom
-        if (y >= hardGroundLevel) {
-            y = hardGroundLevel;
-            velocityY = 0;
-            onGround = true;
+        if (onGround) {
             jumping = false;
-            jumpKeyPressed = false;
-            jumpKeyHeldFrames = 0;
         }
-        
-        // Execute buffered jump if available and on ground
-        if (jumpBufferCounter > 0 && onGround && !jumping) {
-            velocityY = -22; // Jump force
+        if (jumpBuffer > 0 && onGround && !dead) {
+            velY = SmwConstants.JUMP_VEL;
             jumping = true;
-            jumpKeyPressed = true;
-            jumpKeyHeldFrames = 0;
+            jumpHeld = true;
+            jumpHoldFrames = 0;
             onGround = false;
-            jumpBufferCounter = 0; // Consume the buffer
+            jumpBuffer = 0;
         }
-        
-        // Decrement jump buffer counter each frame
-        if (jumpBufferCounter > 0) {
-            jumpBufferCounter--;
+        if (jumpBuffer > 0) {
+            jumpBuffer--;
         }
 
-        // Boundary checks for visual position
-        if (x < -hitboxOffsetX) x = -hitboxOffsetX;
-        if (x + width + hitboxOffsetX > levelWidth) x = levelWidth - width - hitboxOffsetX;
+        if (y > state.level.getPixelHeight() + 32) {
+            die();
+        }
+
+        prevVelY = velY;
+        animFrame++;
+    }
+
+    public double getPrevVelY() {
+        return prevVelY;
+    }
+
+    public void die() {
+        if (!dead) {
+            dead = true;
+            velY = -6;
+            state.hud.loseLife();
+        }
+    }
+
+    public void powerUp(PowerUp.Type type) {
+        if (type == PowerUp.Type.MUSHROOM) {
+            if (!big) {
+                big = true;
+                y -= 12;
+            }
+            state.score += 1000;
+        } else if (type == PowerUp.Type.FLOWER) {
+            big = true;
+            fire = true;
+            state.score += 1000;
+        } else if (type == PowerUp.Type.STAR) {
+            state.starPower = true;
+            state.invincibleFrames = 600;
+        }
+    }
+
+    public void takeDamage() {
+        if (state.starPower || state.invincibleFrames > 0) {
+            return;
+        }
+        if (big) {
+            big = false;
+            fire = false;
+            state.invincibleFrames = 120;
+        } else {
+            die();
+        }
     }
 
     public void draw(Graphics2D g) {
-        BufferedImage currentSprite = null;
-        int drawWidth = spriteWidth;
-        int drawHeight = height;
-        int drawX = x + (width - spriteWidth) / 2;  // Center sprite within hitbox
-
-        // Check if currently jumping
-        if (jumping || (velocityY != 0 && !onGround)) {
-            // Choose jump sprite based on direction and velocity
-            drawWidth = 45; // Smaller width for jump sprites
-            drawHeight = 60;
-            // Center the narrower sprite within the hitbox
-            drawX = x + (width - drawWidth) / 2;
-            if (velocityY < 0) {
-                // Going up
-                if (facingDirection == Direction.RIGHT) {
-                    currentSprite = jumpUpRight;
-                } else {
-                    currentSprite = jumpUpLeft;
-                }
-            } else {
-                // Coming down
-                if (facingDirection == Direction.RIGHT) {
-                    currentSprite = jumpDownRight;
-                } else {
-                    currentSprite = jumpDownLeft;
-                }
-            }
-        } else if (Math.abs(velocityX) > 1.0) {
-            // Running - cycle through animation frames
-            if (facingDirection == Direction.RIGHT) {
-                if (!runningRightFrames.isEmpty()) {
-                    int frameIndex = currentRunningFrame % runningRightFrames.size();
-                    currentSprite = runningRightFrames.get(frameIndex);
-                }
-            } else {
-                if (!runningLeftFrames.isEmpty()) {
-                    int frameIndex = currentRunningFrame % runningLeftFrames.size();
-                    currentSprite = runningLeftFrames.get(frameIndex);
-                }
-            }
-            drawX = x + (width - spriteWidth) / 2;  // Center sprite within hitbox
-        } else {
-            // Idle
-            if (facingDirection == Direction.RIGHT) {
-                currentSprite = idleRight;
-            } else {
-                currentSprite = idleLeft;
-            }
-            drawX = x + (width - spriteWidth) / 2;  // Center sprite within hitbox
+        if (dead) {
+            g.drawImage(SmwAssets.marioDead, (int) x, (int) y + 8, 16, 8, null);
+            return;
         }
 
-        // Draw sprite if loaded, otherwise draw placeholder
-        if (currentSprite != null) {
-            g.drawImage(currentSprite, drawX, y, drawWidth, drawHeight, null);
+        BufferedImage sprite;
+        BufferedImage[] frames;
+        if (!onGround || jumping) {
+            frames = SmwAssets.marioJumpR;
+            sprite = frames[0];
+        } else if ((left && velX > 0.5) || (right && velX < -0.5)) {
+            frames = SmwAssets.marioSkidR;
+            sprite = frames[0];
+        } else if (Math.abs(velX) > 0.3) {
+            frames = SmwAssets.marioRunR;
+            sprite = frames[(animFrame / 4) % frames.length];
         } else {
-            g.setColor(Color.RED);
-            g.fillRect(drawX, y, drawWidth, drawHeight);
+            frames = SmwAssets.marioIdleR;
+            sprite = frames[0];
         }
-        
-        // Draw hitbox for debugging (temporary)
-        int debugHitboxX = x + hitboxOffsetX;
-        g.setColor(new Color(255, 0, 0, 100)); // Semi-transparent red
-        g.fillRect(debugHitboxX, y, width, height);
-        g.setColor(Color.RED);
-        g.setStroke(new BasicStroke(2));
-        g.drawRect(debugHitboxX, y, width, height);
+
+        if (!facingRight) {
+            sprite = SmwAssets.flip(sprite);
+        }
+
+        int h = big ? SmwConstants.MARIO_H_BIG : SmwConstants.MARIO_H_SMALL;
+        int drawY = (int) y + (SmwConstants.MARIO_H_SMALL - h);
+        g.drawImage(sprite, (int) x, drawY, SPRITE_W, h, null);
     }
 
-    public void handleKeyPress(int keyCode) {
-        if (keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_A) {
-            leftPressed = true;
+    public void handleKeyPress(int code) {
+        if (code == KeyEvent.VK_LEFT || code == KeyEvent.VK_A) {
+            left = true;
         }
-        if (keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
-            rightPressed = true;
+        if (code == KeyEvent.VK_RIGHT || code == KeyEvent.VK_D) {
+            right = true;
         }
-        if (keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) {
-            // Set jump buffer for responsive jump detection
-            jumpBufferCounter = jumpBufferWindow;
-            
-            // Try to jump immediately if on ground
-            if (onGround && !jumping) {
-                velocityY = -22; // Jump force
-                jumping = true;
-                jumpKeyPressed = true;
-                jumpKeyHeldFrames = 0;
-                onGround = false;
-                jumpBufferCounter = 0; // Jump executed, clear buffer
-            }
+        if (code == KeyEvent.VK_Z || code == KeyEvent.VK_X || code == KeyEvent.VK_SHIFT) {
+            runKey = true;
+        }
+        if (code == KeyEvent.VK_SPACE || code == KeyEvent.VK_S || code == KeyEvent.VK_UP) {
+            jumpBuffer = 8;
+            jumpHeld = true;
         }
     }
 
-    public void handleKeyRelease(int keyCode) {
-        if (keyCode == KeyEvent.VK_LEFT || keyCode == KeyEvent.VK_A) {
-            leftPressed = false;
+    public void handleKeyRelease(int code) {
+        if (code == KeyEvent.VK_LEFT || code == KeyEvent.VK_A) {
+            left = false;
         }
-        if (keyCode == KeyEvent.VK_RIGHT || keyCode == KeyEvent.VK_D) {
-            rightPressed = false;
+        if (code == KeyEvent.VK_RIGHT || code == KeyEvent.VK_D) {
+            right = false;
         }
-        if (keyCode == KeyEvent.VK_SPACE || keyCode == KeyEvent.VK_W || keyCode == KeyEvent.VK_UP) {
-            // Release jump key - gravity takes over naturally
-            // By releasing the key, you lose the reduced gravity bonus and fall faster
-            if (jumpKeyPressed) {
-                jumpKeyPressed = false;
-                // Let normal gravity handle the descent - no need to set velocity
-            }
+        if (code == KeyEvent.VK_Z || code == KeyEvent.VK_X || code == KeyEvent.VK_SHIFT) {
+            runKey = false;
+        }
+        if (code == KeyEvent.VK_SPACE || code == KeyEvent.VK_S || code == KeyEvent.VK_UP) {
+            jumpHeld = false;
         }
     }
 
     public int getX() {
-        return x;
+        return (int) x;
     }
 
     public int getY() {
-        return y;
+        return (int) y;
+    }
+
+    public void setPosition(int nx, int ny) {
+        x = nx;
+        y = ny;
+    }
+
+    public double getVelX() {
+        return velX;
+    }
+
+    public double getVelY() {
+        return velY;
+    }
+
+    public void setVelX(double v) {
+        velX = v;
+    }
+
+    public void setVelY(double v) {
+        velY = v;
+    }
+
+    public int getHitboxX() {
+        return (int) x + HITBOX_OFFSET;
+    }
+
+    public int getHitboxY() {
+        return (int) y + (big ? 12 : 0);
+    }
+
+    public int getHitboxW() {
+        return HITBOX_W;
+    }
+
+    public int getHitboxH() {
+        return big ? SmwConstants.MARIO_H_BIG - 12 : SmwConstants.MARIO_H_SMALL;
+    }
+
+    public int getHitboxOffsetX() {
+        return HITBOX_OFFSET;
+    }
+
+    public int getSpriteTopOffset() {
+        return big ? 12 : 0;
     }
 
     public int getWidth() {
-        return width;
+        return SPRITE_W;
     }
 
     public int getHeight() {
-        return height;
+        return big ? SmwConstants.MARIO_H_BIG : SmwConstants.MARIO_H_SMALL;
+    }
+
+    public boolean isBig() {
+        return big;
+    }
+
+    public boolean isDead() {
+        return dead;
+    }
+
+    public boolean isFacingRight() {
+        return facingRight;
+    }
+
+    public int getPMeter() {
+        return pMeter;
     }
 }

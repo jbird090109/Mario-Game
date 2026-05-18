@@ -4,7 +4,7 @@ public class Game extends JFrame {
     private GamePanel gamePanel;
 
     public Game() {
-        setTitle("Mario Game");
+        setTitle("Super Mario World");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
 
