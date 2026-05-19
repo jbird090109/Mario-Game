@@ -170,6 +170,9 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
             e.draw(lg);
         }
         state.player.draw(lg);
+        if (HitboxDebug.enabled) {
+            drawEntityHitboxes(lg);
+        }
         lg.dispose();
 
         AffineTransform at = new AffineTransform();
@@ -188,7 +191,82 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
 
         g2d.setColor(Color.GRAY);
         g2d.setFont(new Font("Arial", Font.PLAIN, 11));
-        g2d.drawString("Arrows: move | Z/Shift: run | Space: jump | P: pause | R: restart", 8, SCREEN_H + 28);
+        g2d.drawString("Arrows: move | Z/Shift: run | Space: jump | P: pause | R: restart | H: hitboxes", 8, SCREEN_H + 28);
+        if (HitboxDebug.enabled) {
+            drawHitboxLegend(g2d);
+        }
+    }
+
+    private void drawEntityHitboxes(Graphics2D g) {
+        Player p = state.player;
+        HitboxDebug.drawRect(g, p.getHitboxX(), p.getHitboxY(), p.getHitboxW(), p.getHitboxH(),
+                new Color(255, 0, 0), Color.RED);
+        HitboxDebug.drawLabel(g, p.getHitboxX(), p.getHitboxY(), "Mario", Color.RED);
+        HitboxDebug.drawRect(g, p.getX(), p.getY(), p.getWidth(), p.getHeight(),
+                new Color(255, 200, 0), new Color(255, 180, 0));
+        HitboxDebug.drawLabel(g, p.getX(), p.getY(), "Sprite", new Color(255, 200, 0));
+
+        for (PowerUp pu : state.level.powerUps) {
+            if (!pu.isActive()) {
+                continue;
+            }
+            HitboxDebug.drawRect(g, pu.getX(), pu.getY(), pu.getWidth(), pu.getHeight(),
+                    new Color(0, 180, 255), Color.CYAN);
+            HitboxDebug.drawLabel(g, pu.getX(), pu.getY(), pu.getType().name(), Color.CYAN);
+        }
+
+        for (Enemy e : state.level.enemies) {
+            if (e.isDefeated()) {
+                continue;
+            }
+            Color fill;
+            Color stroke;
+            String label;
+            if (e instanceof Koopa) {
+                Koopa k = (Koopa) e;
+                if (k.isShell()) {
+                    fill = new Color(0, 120, 0);
+                    stroke = new Color(0, 255, 0);
+                    label = k.isShellMoving() ? "Shell (moving)" : "Shell";
+                } else {
+                    fill = new Color(0, 160, 80);
+                    stroke = new Color(100, 255, 150);
+                    label = "Koopa";
+                }
+            } else {
+                fill = new Color(160, 80, 40);
+                stroke = new Color(255, 140, 0);
+                label = e.isDead() ? "Goomba (dead)" : "Goomba";
+            }
+            HitboxDebug.drawRect(g, e.getX(), e.getY(), e.getWidth(), e.getHeight(), fill, stroke);
+            HitboxDebug.drawLabel(g, e.getX(), e.getY(), label, stroke);
+
+            int stompZoneH = Math.max(8, e.getHeight() / 2 + 2);
+            HitboxDebug.drawRect(g, e.getX(), e.getY(), e.getWidth(), stompZoneH,
+                    new Color(255, 255, 0), Color.YELLOW);
+        }
+    }
+
+    private void drawHitboxLegend(Graphics2D g) {
+        int x = SCREEN_W - 155;
+        int y = SCREEN_H - 8;
+        g.setFont(new Font("Arial", Font.PLAIN, 10));
+        g.setColor(new Color(255, 255, 255, 200));
+        g.fillRoundRect(x - 6, y - 52, 150, 58, 6, 6);
+        g.setColor(Color.WHITE);
+        g.drawString("Hitboxes (H)", x, y - 40);
+        g.setColor(Color.RED);
+        g.drawString("Red = Mario hitbox", x, y - 28);
+        g.setColor(new Color(255, 200, 0));
+        g.drawString("Gold = Mario sprite", x, y - 16);
+        g.setColor(new Color(255, 140, 0));
+        g.drawString("Orange = Goomba", x, y - 4);
+        g.setColor(Color.GREEN);
+        g.drawString("Green = Koopa/Shell", x + 72, y - 28);
+        g.setColor(Color.CYAN);
+        g.drawString("Cyan = Power-up", x + 72, y - 16);
+        g.setColor(Color.YELLOW);
+        g.drawString("Yellow = stomp zone", x + 72, y - 4);
     }
 
     /** @return true if the enemy was handled (stomp/shell) and should not damage the player */
@@ -246,6 +324,10 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         }
         if (e.getKeyCode() == KeyEvent.VK_R) {
             resetLevel();
+            return;
+        }
+        if (e.getKeyCode() == KeyEvent.VK_H) {
+            HitboxDebug.enabled = !HitboxDebug.enabled;
             return;
         }
         if (!state.gameOver && !state.levelComplete) {
