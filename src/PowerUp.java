@@ -101,6 +101,13 @@ public class PowerUp {
     }
 
     public boolean intersects(int px, int py, int pw, int ph) {
-        return active && emerged && px < getX() + 16 && px + pw > getX() && py < getY() + 16 && py + ph > getY();
+        if (!active) {
+            return false;
+        }
+        return px < getX() + 16 && px + pw > getX() && py < getY() + 16 && py + ph > getY();
+    }
+
+    public boolean canCollect() {
+        return active && (emerged || emergeTimer > 8);
     }
 }

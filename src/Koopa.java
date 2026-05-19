@@ -9,16 +9,26 @@ public class Koopa extends Enemy {
         super(x, y);
     }
 
+    public boolean isShell() {
+        return shell;
+    }
+
+    public boolean isShellMoving() {
+        return shell && Math.abs(vx) > 0.5;
+    }
+
     @Override
     public void stomp() {
-        if (shell) {
-            shellKick(vx > 0 ? -1 : 1);
-        } else {
+        if (!shell) {
             shell = true;
             vx = 0;
             height = 14;
             y += 2;
         }
+    }
+
+    public void kickShell(int dir) {
+        shellKick(dir);
     }
 
     @Override

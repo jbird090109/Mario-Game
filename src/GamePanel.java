@@ -110,7 +110,7 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
 
         for (PowerUp p : state.level.powerUps) {
             p.update(state.level);
-            if (p.intersects(state.player.getHitboxX(), state.player.getHitboxY(),
+            if (p.canCollect() && p.intersects(state.player.getHitboxX(), state.player.getHitboxY(),
                     state.player.getHitboxW(), state.player.getHitboxH())) {
                 state.player.powerUp(p.getType());
                 p.deactivate();
@@ -119,20 +119,17 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
 
         for (Enemy e : state.level.enemies) {
             e.update(state.level);
-            if (e.isDefeated()) {
+            if (e.isDefeated() || e.isDead()) {
                 continue;
             }
             if (!e.intersects(state.player.getHitboxX(), state.player.getHitboxY(),
                     state.player.getHitboxW(), state.player.getHitboxH())) {
                 continue;
             }
-            boolean stomp = state.player.getPrevVelY() > 0
-                    && state.player.getHitboxY() + state.player.getHitboxH() - 4 < e.getY() + e.getHeight() / 2;
-            if (stomp) {
-                e.stomp();
-                state.player.setVelY(-5);
-                state.score += 200;
-            } else if (state.starPower) {
+            if (handleEnemyContact(e)) {
+                continue;
+            }
+            if (state.starPower) {
                 e.stomp();
                 state.score += 200;
             } else {
@@ -192,6 +189,46 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
         g2d.setColor(Color.GRAY);
         g2d.setFont(new Font("Arial", Font.PLAIN, 11));
         g2d.drawString("Arrows: move | Z/Shift: run | Space: jump | P: pause | R: restart", 8, SCREEN_H + 28);
+    }
+
+    /** @return true if the enemy was handled (stomp/shell) and should not damage the player */
+    private boolean handleEnemyContact(Enemy e) {
+        Player player = state.player;
+        if (isStomp(player, e)) {
+            if (e instanceof Koopa) {
+                Koopa koopa = (Koopa) e;
+                if (koopa.isShell()) {
+                    int kickDir = player.getX() + player.getWidth() / 2 <= koopa.getX() + koopa.getWidth() / 2 ? 1 : -1;
+                    koopa.kickShell(kickDir);
+                } else {
+                    koopa.stomp();
+                }
+            } else {
+                e.stomp();
+            }
+            player.setVelY(-5);
+            state.score += 200;
+            return true;
+        }
+        if (e instanceof Koopa) {
+            Koopa koopa = (Koopa) e;
+            if (koopa.isShell() && !koopa.isShellMoving()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isStomp(Player player, Enemy enemy) {
+        int playerBottom = player.getHitboxY() + player.getHitboxH();
+        int enemyTop = enemy.getY();
+        int enemyMidY = enemy.getY() + enemy.getHeight() / 2;
+
+        boolean feetOnEnemy = playerBottom <= enemyTop + Math.max(8, enemy.getHeight() / 2 + 2);
+        boolean falling = player.getVelYBeforeResolve() > 0.1 || player.getVelY() > 0.1;
+        boolean aboveCenter = player.getHitboxY() + player.getHitboxH() / 2 < enemyMidY;
+
+        return feetOnEnemy && (falling || aboveCenter);
     }
 
     private void drawCentered(Graphics2D g, String text, Color c) {

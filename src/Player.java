@@ -10,6 +10,7 @@ public class Player {
     private double velX;
     private double velY;
     private double prevVelY;
+    private double velYBeforeResolve;
     private boolean onGround;
     private boolean jumping;
     private boolean jumpHeld;
@@ -102,6 +103,7 @@ public class Player {
             velY += SmwConstants.GRAVITY_DESCENT;
         }
 
+        velYBeforeResolve = velY;
         onGround = TileCollision.resolve(this, state.level);
 
         if (onGround) {
@@ -131,6 +133,11 @@ public class Player {
         return prevVelY;
     }
 
+    /** Vertical velocity immediately before tile collision (used for stomp detection). */
+    public double getVelYBeforeResolve() {
+        return velYBeforeResolve;
+    }
+
     public void die() {
         if (!dead) {
             dead = true;
@@ -140,6 +147,7 @@ public class Player {
     }
 
     public void powerUp(PowerUp.Type type) {
+        state.invincibleFrames = Math.max(state.invincibleFrames, 90);
         if (type == PowerUp.Type.MUSHROOM) {
             if (!big) {
                 big = true;
