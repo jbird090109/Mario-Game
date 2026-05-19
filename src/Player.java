@@ -1,6 +1,9 @@
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 
 public class Player {
     private final GameState state;
@@ -25,9 +28,26 @@ public class Player {
     private boolean big;
     private boolean fire;
     private boolean dead;
-    private int animFrame;
     private int speedOscIndex;
     private int pMeter;
+
+    private final File jumpingleftdown = new File("assets\\jumpingleftdown.png");
+    private final File jumpingupleft = new File("assets\\jumpingupleft.png");
+    private final File jumpingupright = new File("assets\\jumpingupright.png");
+    private final File jumpingrightdown = new File("assets\\jumpingrightdown.png");
+    private final File leftIdle = new File("assets\\Left.png");
+    private final File rightIdle = new File("assets\\Right.png");
+    private final File runningLeft = new File("assets\\Running Left.gif");
+    private final File runningRight = new File("assets\\Running Right.gif");
+
+    private final BufferedImage imgJumpingLeftDown;
+    private final BufferedImage imgJumpingUpLeft;
+    private final BufferedImage imgJumpingUpRight;
+    private final BufferedImage imgJumpingRightDown;
+    private final BufferedImage imgLeft;
+    private final BufferedImage imgRight;
+    private final BufferedImage imgRunningLeft;
+    private final BufferedImage imgRunningRight;
 
     private static final int HITBOX_W = SmwConstants.MARIO_W;
     private static final int HITBOX_OFFSET = 1;
@@ -36,6 +56,27 @@ public class Player {
     public Player(GameState state, int startY) {
         this.state = state;
         this.y = startY;
+        imgJumpingLeftDown = loadSprite(jumpingleftdown);
+        imgJumpingUpLeft = loadSprite(jumpingupleft);
+        imgJumpingUpRight = loadSprite(jumpingupright);
+        imgJumpingRightDown = loadSprite(jumpingrightdown);
+        imgLeft = loadSprite(leftIdle);
+        imgRight = loadSprite(rightIdle);
+        imgRunningLeft = loadSprite(runningLeft);
+        imgRunningRight = loadSprite(runningRight);
+    }
+
+    private static BufferedImage loadSprite(File file) {
+        try {
+            BufferedImage img = ImageIO.read(file);
+            if (img == null) {
+                throw new IOException("unrecognized image format");
+            }
+            return img;
+        } catch (IOException e) {
+            System.err.println("Failed to load sprite: " + file.getPath() + " (" + e.getMessage() + ")");
+            return null;
+        }
     }
 
     public GameState getState() {
@@ -126,7 +167,6 @@ public class Player {
         }
 
         prevVelY = velY;
-        animFrame++;
     }
 
     public double getPrevVelY() {
@@ -183,29 +223,30 @@ public class Player {
             return;
         }
 
-        BufferedImage sprite;
-        BufferedImage[] frames;
-        if (!onGround || jumping) {
-            frames = SmwAssets.marioJumpR;
-            sprite = frames[0];
-        } else if ((left && velX > 0.5) || (right && velX < -0.5)) {
-            frames = SmwAssets.marioSkidR;
-            sprite = frames[0];
-        } else if (Math.abs(velX) > 0.3) {
-            frames = SmwAssets.marioRunR;
-            sprite = frames[(animFrame / 4) % frames.length];
-        } else {
-            frames = SmwAssets.marioIdleR;
-            sprite = frames[0];
-        }
-
-        if (!facingRight) {
-            sprite = SmwAssets.flip(sprite);
+        BufferedImage sprite = pickSprite();
+        if (sprite == null) {
+            return;
         }
 
         int h = big ? SmwConstants.MARIO_H_BIG : SmwConstants.MARIO_H_SMALL;
         int drawY = (int) y + (SmwConstants.MARIO_H_SMALL - h);
         g.drawImage(sprite, (int) x, drawY, SPRITE_W, h, null);
+    }
+
+    private BufferedImage pickSprite() {
+        if (!onGround || jumping) {
+            if (velY < 0) {
+                return facingRight ? imgJumpingUpRight : imgJumpingUpLeft;
+            }
+            return facingRight ? imgJumpingRightDown : imgJumpingLeftDown;
+        }
+        if ((left && velX > 0.5) || (right && velX < -0.5)) {
+            return facingRight ? imgRunningRight : imgRunningLeft;
+        }
+        if (Math.abs(velX) > 0.3) {
+            return facingRight ? imgRunningRight : imgRunningLeft;
+        }
+        return facingRight ? imgRight : imgLeft;
     }
 
     public void handleKeyPress(int code) {
