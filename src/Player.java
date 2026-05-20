@@ -188,19 +188,51 @@ public class Player {
 
     public void powerUp(PowerUp.Type type) {
         state.invincibleFrames = Math.max(state.invincibleFrames, 90);
-        if (type == PowerUp.Type.MUSHROOM) {
-            if (!big) {
-                big = true;
-                y -= 12;
-            }
-            state.score += 1000;
+        if (type == PowerUp.Type.MUSHROOM && !big) {
+            growBig();
         } else if (type == PowerUp.Type.FLOWER) {
-            big = true;
+            if (!big) {
+                growBig();
+            }
             fire = true;
-            state.score += 1000;
         } else if (type == PowerUp.Type.STAR) {
             state.starPower = true;
             state.invincibleFrames = 600;
+        }
+        state.score += 1000;
+        snapToGround(state.level);
+    }
+
+    /** Grow while keeping Mario's feet in the same place (SMW-style). */
+    private void growBig() {
+        int feet = getHitboxY() + getHitboxH();
+        big = true;
+        y = feet - getFootOffset();
+    }
+
+    /** Distance from sprite Y to the bottom of the hitbox (feet). */
+    public int getFootOffset() {
+        return big ? SmwConstants.MARIO_H_BIG : SmwConstants.MARIO_H_SMALL;
+    }
+
+    /** Re-seat Mario on ground after size change so he does not fall through tiles. */
+    public void snapToGround(Level level) {
+        int tx = (getHitboxX() + getHitboxW() / 2) / SmwConstants.TILE;
+        int foot = getHitboxY() + getHitboxH();
+        int ty = Math.min(level.height - 1, Math.max(0, foot / SmwConstants.TILE));
+
+        for (int row = ty; row >= 0; row--) {
+            TileType tile = level.getTile(tx, row);
+            if (!tile.solid || tile == TileType.SEMI_SOLID) {
+                continue;
+            }
+            int groundTop = row * SmwConstants.TILE;
+            if (foot >= groundTop - 2 && foot <= groundTop + SmwConstants.TILE + 2) {
+                y = groundTop - getFootOffset();
+                velY = 0;
+                onGround = true;
+                return;
+            }
         }
     }
 

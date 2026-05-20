@@ -30,7 +30,7 @@ public class PowerUp {
             y = startY - emergeTimer * 0.5;
             if (emergeTimer > 32) {
                 emerged = true;
-                y = startY - 16;
+                y = startY - SmwConstants.TILE;
             }
             return;
         }

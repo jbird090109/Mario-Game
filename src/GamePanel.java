@@ -110,11 +110,21 @@ public class GamePanel extends JPanel implements KeyListener, Runnable {
 
         for (PowerUp p : state.level.powerUps) {
             p.update(state.level);
-            if (p.canCollect() && p.intersects(state.player.getHitboxX(), state.player.getHitboxY(),
-                    state.player.getHitboxW(), state.player.getHitboxH())) {
-                state.player.powerUp(p.getType());
-                p.deactivate();
+            if (!p.canCollect()) {
+                continue;
             }
+            Player player = state.player;
+            if (!p.intersects(player.getHitboxX(), player.getHitboxY(),
+                    player.getHitboxW(), player.getHitboxH())) {
+                continue;
+            }
+            // Collect from the side/below; only stomp-style overlap from above should not eat the mushroom
+            if (p.getType() == PowerUp.Type.MUSHROOM && player.getVelY() < -1
+                    && player.getHitboxY() + player.getHitboxH() < p.getY() + p.getHeight() / 2) {
+                continue;
+            }
+            player.powerUp(p.getType());
+            p.deactivate();
         }
 
         for (Enemy e : state.level.enemies) {

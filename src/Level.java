@@ -149,7 +149,6 @@ public class Level {
             } else {
                 powerUps.add(new PowerUp(px, py, PowerUp.Type.FLOWER));
             }
-            state.score += 1000;
         } else if (t == TileType.BRICK && state.player.isBig()) {
             tiles[ty][tx] = TileType.EMPTY;
             state.score += 50;

@@ -20,14 +20,15 @@ public final class TileCollision {
         if (intersectsSolid(level, p, true)) {
             if (p.getVelY() > 0) {
                 int ty = (p.getHitboxY() + p.getHitboxH()) / SmwConstants.TILE;
-                int newY = ty * SmwConstants.TILE - p.getHitboxH() + p.getSpriteTopOffset();
+                int newY = ty * SmwConstants.TILE - p.getFootOffset();
                 p.setPosition(p.getX(), newY);
                 p.setVelY(0);
                 onGround = true;
             } else if (p.getVelY() < 0) {
                 int ty = p.getHitboxY() / SmwConstants.TILE;
                 int tx = (p.getHitboxX() + p.getHitboxW() / 2) / SmwConstants.TILE;
-                p.setPosition(p.getX(), (ty + 1) * SmwConstants.TILE + p.getSpriteTopOffset());
+                int newY = (ty + 1) * SmwConstants.TILE - (p.getHitboxY() - p.getY());
+                p.setPosition(p.getX(), newY);
                 p.setVelY(0);
                 level.bumpBlock(tx, ty, p.getState());
             }
@@ -42,7 +43,7 @@ public final class TileCollision {
                 if (level.getTile(tx, ty) == TileType.SEMI_SOLID) {
                     int top = ty * SmwConstants.TILE;
                     if (foot >= top && foot <= top + SmwConstants.TILE) {
-                        p.setPosition(p.getX(), top - p.getHitboxH() + p.getSpriteTopOffset());
+                        p.setPosition(p.getX(), top - p.getFootOffset());
                         p.setVelY(0);
                         onGround = true;
                         break;
