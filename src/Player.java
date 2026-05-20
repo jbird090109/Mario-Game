@@ -261,7 +261,7 @@ public class Player {
         }
 
         int h = big ? SmwConstants.MARIO_H_BIG : SmwConstants.MARIO_H_SMALL;
-        int drawY = (int) y + (SmwConstants.MARIO_H_SMALL - h);
+        int drawY = (int) y;
         g.drawImage(sprite, (int) x, drawY, SPRITE_W, h, null);
     }
 
